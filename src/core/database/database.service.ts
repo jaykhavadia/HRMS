@@ -1,0 +1,108 @@
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection, createConnection } from 'mongoose';
+import { ConfigService } from '../../config/config.service';
+
+@Injectable()
+export class DatabaseService implements OnModuleInit {
+  private tenantConnections: Map<string, Connection> = new Map();
+
+  constructor(
+    @InjectConnection() private masterConnection: Connection,
+    private configService: ConfigService,
+  ) {}
+
+  onModuleInit() {
+    // Master connection is already established via MongooseModule
+  }
+
+  /**
+   * Get tenant database name
+   */
+  getTenantDbName(clientId: string, clientName: string): string {
+    const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9]/g, '_');
+    return `${clientId}_${sanitizedClientName}`.toLowerCase();
+  }
+
+  /**
+   * Get tenant connection URI
+   */
+  getTenantConnectionUri(baseUri: string, dbName: string): string {
+    // For MongoDB Atlas, append database name to connection string
+    if (baseUri.includes('mongodb.net')) {
+      return baseUri.replace(/\/[^\/]*$/, `/${dbName}`);
+    }
+    // For local MongoDB: remove existing database name and append tenant database name
+    // Example: mongodb://localhost:27017/hrms-master -> mongodb://localhost:27017/{dbName}
+    const uriWithoutDb = baseUri.replace(/\/[^\/]*$/, '');
+    return `${uriWithoutDb}/${dbName}`;
+  }
+
+  /**
+   * Get or create tenant database connection
+   */
+  async getTenantConnection(
+    clientId: string,
+    clientName: string,
+  ): Promise<Connection> {
+    const dbName = this.getTenantDbName(clientId, clientName);
+    const connectionKey = `${clientId}_${dbName}`;
+
+    if (this.tenantConnections.has(connectionKey)) {
+      const existingConnection = this.tenantConnections.get(connectionKey);
+      if (existingConnection) {
+        return existingConnection;
+      }
+    }
+
+    // Use master DB URI for tenant databases (local MongoDB)
+    const baseUri = this.configService.getMasterDbUri();
+    const connectionUri = this.getTenantConnectionUri(baseUri, dbName);
+
+    const connection = await createConnection(connectionUri).asPromise();
+    this.tenantConnections.set(connectionKey, connection);
+
+    return connection;
+  }
+
+  /**
+   * Get tenant model for a specific database
+   */
+  async getTenantModel<T>(
+    clientId: string,
+    clientName: string,
+    modelName: string,
+    schema: any,
+  ): Promise<any> {
+    const connection = await this.getTenantConnection(clientId, clientName);
+
+    // Return existing model if already registered
+    if (connection.models[modelName]) {
+      return connection.models[modelName];
+    }
+
+    // Create and return new model
+    return connection.model(modelName, schema);
+  }
+
+  /**
+   * Create tenant database and initialize collections
+   */
+  async createTenantDatabase(
+    clientId: string,
+    clientName: string,
+  ): Promise<void> {
+    const connection = await this.getTenantConnection(clientId, clientName);
+    const db = connection.db;
+
+    if (!db) {
+      throw new Error('Database connection failed');
+    }
+
+    // Database is created automatically on first use
+    // Initialize default collections/indexes if needed
+    await db.collection('users').createIndex({ email: 1 }, { unique: true });
+    await db.collection('attendance').createIndex({ userId: 1, date: 1 });
+    await db.collection('attendance').createIndex({ checkInTime: 1 });
+  }
+}
