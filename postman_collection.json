@@ -45,7 +45,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["organization", "register"]
 						},
-						"description": "Register a new organization. Creates master DB record, tenant database, and admin user."
+						"description": "Register a new organization. Creates master DB record, tenant database, and admin user.\n\n**Important:**\n- companyEmail domain MUST match companyDomain (e.g., if domain is 'acme-corp', email must be '@acme-corp.com')\n- adminEmail domain MUST match companyDomain (if provided)\n- Only ONE admin user is created during registration\n- This admin is the only admin for the organization"
 					},
 					"response": []
 				}
@@ -78,11 +78,6 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}",
-								"description": "Tenant identifier"
 							}
 						],
 						"body": {
@@ -94,7 +89,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["auth", "login"]
 						},
-						"description": "Login with email and password. Returns JWT token."
+						"description": "Login with email and password. Tenant is automatically resolved from email domain (e.g., acme-corp from john@acme-corp.com). Returns JWT token."
 					},
 					"response": []
 				},
@@ -106,22 +101,18 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}"
 							}
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"token\": \"password-setup-token-from-email\",\n  \"password\": \"NewSecurePassword123!\"\n}"
+							"raw": "{\n  \"token\": \"acme-corp:password-setup-token-from-email\",\n  \"password\": \"NewSecurePassword123!\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/setup-password",
 							"host": ["{{base_url}}"],
 							"path": ["auth", "setup-password"]
 						},
-						"description": "Set password using token received via email."
+						"description": "Set password using token received via email. Token format: 'tenantDomain:token' (e.g., 'acme-corp:token'). Email is optional."
 					},
 					"response": []
 				}
@@ -142,22 +133,23 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}"
 							}
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"email\": \"jane.smith@acme-corp.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"role\": \"employee\",\n  \"status\": \"active\"\n}"
+							"raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"email\": \"jane.smith@acme-corp.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"role\": \"employee\",\n  \"status\": \"active\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": {
 							"raw": "{{base_url}}/user",
 							"host": ["{{base_url}}"],
 							"path": ["user"]
 						},
-						"description": "Create a new user. Admin only. Password setup email will be sent."
+						"description": "Create a new user. Admin only. Tenant is resolved from authenticated user's email. Password setup email will be sent.\n\n**Important:**\n- User email domain MUST match organization domain (e.g., if org domain is 'acme-corp', email must be '@acme-corp.com')\n- Role can only be 'employee' (admin role is not allowed - only one admin per organization)\n- If role is not provided, defaults to 'employee'"
 					},
 					"response": []
 				},
@@ -169,10 +161,6 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}"
 							}
 						],
 						"body": {
@@ -182,7 +170,7 @@
 									"key": "file",
 									"type": "file",
 									"src": [],
-									"description": "Excel file with columns: First Name, Last Name, Email, Mobile Number, Role, Status"
+									"description": "Excel file with columns: First Name, Last Name, Email, Mobile Number, Role (must be 'employee'), Status. All emails must match organization domain."
 								}
 							]
 						},
@@ -191,7 +179,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user", "bulk-upload"]
 						},
-						"description": "Bulk upload users from Excel file. Admin only."
+						"description": "Bulk upload users from Excel file. Admin only. Tenant is resolved from authenticated user's email.\n\n**Excel Format:**\n- Columns: First Name, Last Name, Email, Mobile Number, Role, Status\n- All user emails MUST match organization domain (e.g., if org domain is 'acme-corp', emails must be '@acme-corp.com')\n- Role can only be 'employee' (admin role will be rejected - only one admin per organization)\n- Invalid rows will be skipped with error messages showing row numbers"
 					},
 					"response": []
 				},
@@ -203,10 +191,6 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}"
 							}
 						],
 						"url": {
@@ -221,7 +205,7 @@
 								}
 							]
 						},
-						"description": "Get all users. Admin sees all, employee sees only own profile."
+						"description": "Get all users. Tenant is resolved from authenticated user's email. Admin sees all, employee sees only own profile."
 					},
 					"response": []
 				},
@@ -233,10 +217,6 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}"
 							}
 						],
 						"url": {
@@ -251,7 +231,72 @@
 								}
 							]
 						},
-						"description": "Get user by ID. Employees can only view their own profile."
+						"description": "Get user by ID. Tenant is resolved from authenticated user's email. Employees can only view their own profile."
+					},
+					"response": []
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Jane Updated\",\n  \"lastName\": \"Smith Updated\",\n  \"email\": \"jane.updated@acme-corp.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"status\": \"active\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/user/:id",
+							"host": ["{{base_url}}"],
+							"path": ["user", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{user_id}}",
+									"description": "User ID to update"
+								}
+							]
+						},
+						"description": "Update user information. Admin only. Tenant is resolved from authenticated user's email.\n\n**Important:**\n- Admin user CANNOT be updated (protected)\n- User email domain MUST match organization domain if email is being updated\n- Role cannot be updated (immutable)\n- All fields are optional - only provided fields will be updated"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/:id",
+							"host": ["{{base_url}}"],
+							"path": ["user", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{user_id}}",
+									"description": "User ID to delete"
+								}
+							]
+						},
+						"description": "Delete a user. Admin only. Tenant is resolved from authenticated user's email.\n\n**Important:**\n- Admin user CANNOT be deleted (protected)\n- Only employee users can be deleted"
 					},
 					"response": []
 				}
@@ -268,10 +313,6 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}"
 							}
 						],
 						"body": {
@@ -308,7 +349,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["attendance", "check-in"]
 						},
-						"description": "Check in with selfie and location. Location must be within office radius."
+						"description": "Check in with selfie and location. Tenant is resolved from authenticated user's email. Location must be within office radius."
 					},
 					"response": []
 				},
@@ -320,10 +361,6 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}"
 							}
 						],
 						"body": {
@@ -356,7 +393,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["attendance", "check-out"]
 						},
-						"description": "Check out with selfie and location. Must have checked in first."
+						"description": "Check out with selfie and location. Tenant is resolved from authenticated user's email. Must have checked in first."
 					},
 					"response": []
 				},
@@ -368,10 +405,6 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}"
 							}
 						],
 						"url": {
@@ -396,7 +429,7 @@
 								}
 							]
 						},
-						"description": "Get attendance records. Admin can filter by userId, employees see only own records."
+						"description": "Get attendance records. Tenant is resolved from authenticated user's email. Admin can filter by userId, employees see only own records."
 					},
 					"response": []
 				}
@@ -413,10 +446,6 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}"
-							},
-							{
-								"key": "X-Tenant-Domain",
-								"value": "{{company_domain}}"
 							}
 						],
 						"url": {
@@ -424,7 +453,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["dashboard", "stats"]
 						},
-						"description": "Get dashboard statistics. Admin only. Returns user stats, attendance stats, and recent records."
+						"description": "Get dashboard statistics. Tenant is resolved from authenticated user's email. Admin only. Returns user stats, attendance stats, and recent records."
 					},
 					"response": []
 				}

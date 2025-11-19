@@ -24,7 +24,7 @@ export class CreateUserDto {
   mobileNumber?: string;
 
   @IsOptional()
-  @IsEnum(['admin', 'employee'])
+  @IsEnum(['employee']) // Only 'employee' allowed - admin role cannot be assigned
   role?: string;
 
   @IsOptional()

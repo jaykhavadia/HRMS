@@ -11,19 +11,19 @@ export class TenantService {
   ) {}
 
   /**
-   * Resolve tenant from subdomain or custom header
+   * Resolve tenant from domain extracted from email
+   * Example: acme-corp from john@acme-corp.com
    */
-  async resolveTenant(tenantIdentifier: string): Promise<Organization> {
+  async resolveTenant(tenantDomain: string): Promise<Organization> {
     const organization = await this.organizationModel.findOne({
-      $or: [
-        { companyDomain: tenantIdentifier },
-        { clientId: tenantIdentifier },
-      ],
+      companyDomain: tenantDomain,
       isActive: true,
     });
 
     if (!organization) {
-      throw new NotFoundException('Organization not found');
+      throw new NotFoundException(
+        `Organization with domain '${tenantDomain}' not found`,
+      );
     }
 
     return organization;

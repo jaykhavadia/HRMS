@@ -5,6 +5,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -29,11 +30,16 @@ export class AuthController {
   async setupPassword(
     @Body() setupPasswordDto: SetupPasswordDto,
     @Tenant() tenant: any,
+    @Req() request: any,
   ) {
+    // Get decoded token from TenantGuard
+    const rawToken = request.decodedToken || setupPasswordDto.token;
+    
     return this.authService.setupPassword(
       setupPasswordDto,
       tenant.clientId,
       tenant.clientName,
+      rawToken,
     );
   }
 }

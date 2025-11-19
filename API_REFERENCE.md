@@ -8,7 +8,12 @@ http://localhost:3000
 ## Authentication
 All protected endpoints require:
 - **Header:** `Authorization: Bearer {access_token}`
-- **Header:** `X-Tenant-Domain: {company_domain}` OR `X-Tenant-ID: {client_id}`
+
+**Tenant Resolution:** Tenant is automatically resolved from the user's email address:
+- Email: `john.doe@acme-corp.com` → Tenant domain: `acme-corp`
+- The domain is extracted from the email (part between @ and .com)
+- For login/setup-password: Email is in request body
+- For authenticated requests: Email is extracted from JWT token
 
 ---
 
@@ -48,7 +53,7 @@ POST /organization/register
 ```
 POST /auth/login
 ```
-**Headers:** `X-Tenant-Domain: {domain}`
+**Note:** Tenant is automatically resolved from email domain (e.g., `acme-corp` from `john@acme-corp.com`)
 
 **Request:**
 ```json
@@ -76,15 +81,19 @@ POST /auth/login
 ```
 POST /auth/setup-password
 ```
-**Headers:** `X-Tenant-Domain: {domain}`
+**Note:** Tenant is automatically resolved from token (format: `tenantDomain:token`)
 
 **Request:**
 ```json
 {
-  "token": "token-from-email",
+  "token": "acme-corp:token-from-email",
   "password": "NewSecurePassword123!"
 }
 ```
+
+**Token Format:** The token includes the tenant domain: `{tenantDomain}:{token}`
+- Example: `acme-corp:550e8400-e29b-41d4-a716-446655440000`
+- Email is optional - if provided, will be verified against the user record
 
 ---
 
@@ -95,7 +104,9 @@ POST /auth/setup-password
 POST /user
 ```
 **Auth:** Required (Admin only)  
-**Headers:** `Authorization: Bearer {token}`, `X-Tenant-Domain: {domain}`
+**Headers:** `Authorization: Bearer {token}`
+
+**Note:** Tenant is resolved from authenticated user's email
 
 **Request:**
 ```json
@@ -300,14 +311,21 @@ GET /dashboard/stats
 
 ## Tenant Resolution
 
-Tenant can be identified via:
+Tenant is automatically resolved from the user's email address:
 
-1. **Header (Recommended):**
-   - `X-Tenant-Domain: acme-corp`
-   - OR `X-Tenant-ID: {client_id}`
+**How it works:**
+1. Extract domain from email: `john.doe@acme-corp.com` → `acme-corp`
+2. Look up organization with matching `companyDomain`
+3. Connect to tenant database
 
-2. **Subdomain:**
-   - `acme-corp.localhost:3000/auth/login`
+**Email Format:**
+- `user@acme-corp.com` → Tenant: `acme-corp`
+- `admin@company.com` → Tenant: `company`
+- `user@sub.company.co.uk` → Tenant: `sub.company.co`
+
+**For different endpoints:**
+- **Login/Setup Password:** Email in request body
+- **Authenticated requests:** Email extracted from JWT token (set during login)
 
 ---
 

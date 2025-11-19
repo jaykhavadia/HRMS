@@ -62,13 +62,12 @@ Check the admin email inbox for the password setup email. Use the token from the
 **Request Body:**
 ```json
 {
-  "token": "token-from-email",
+  "token": "acme-corp:token-from-email",
   "password": "SecurePassword123!"
 }
 ```
 
-**Headers:**
-- `X-Tenant-Domain: acme-corp` (or your domain)
+**Note:** Token format is `tenantDomain:token` (e.g., `acme-corp:550e8400-e29b-41d4-a716-446655440000`). Tenant is automatically resolved from the token. Email is optional.
 
 ### Step 3: Login
 
@@ -82,8 +81,7 @@ Check the admin email inbox for the password setup email. Use the token from the
 }
 ```
 
-**Headers:**
-- `X-Tenant-Domain: acme-corp`
+**Note:** Tenant is automatically resolved from email domain (`acme-corp` from `john.doe@acme-corp.com`)
 
 **Response:**
 - Auto-saves `access_token`, `user_id`, `user_role` to environment
@@ -96,7 +94,8 @@ Check the admin email inbox for the password setup email. Use the token from the
 
 **Headers:**
 - `Authorization: Bearer {{access_token}}`
-- `X-Tenant-Domain: {{company_domain}}`
+
+**Note:** Tenant is resolved from authenticated user's email (from JWT token)
 
 **Request Body:**
 ```json
@@ -115,7 +114,8 @@ Check the admin email inbox for the password setup email. Use the token from the
 
 **Headers:**
 - `Authorization: Bearer {{access_token}}`
-- `X-Tenant-Domain: {{company_domain}}`
+
+**Note:** Tenant is resolved from authenticated user's email (from JWT token)
 
 **Body:** Form-data
 - `file`: Select Excel file (.xlsx or .xls)
@@ -132,7 +132,8 @@ Check the admin email inbox for the password setup email. Use the token from the
 
 **Headers:**
 - `Authorization: Bearer {{access_token}}`
-- `X-Tenant-Domain: {{company_domain}}`
+
+**Note:** Tenant is resolved from authenticated user's email (from JWT token)
 
 **Body:** Form-data
 - `latitude`: 40.7128 (must be within office radius)
@@ -159,7 +160,8 @@ Same format as check-in. Must have checked in first on the same day.
 
 **Headers:**
 - `Authorization: Bearer {{access_token}}`
-- `X-Tenant-Domain: {{company_domain}}`
+
+**Note:** Tenant is resolved from authenticated user's email (from JWT token)
 
 **Response:**
 - Admin: All attendance records (or filtered)
@@ -171,7 +173,8 @@ Same format as check-in. Must have checked in first on the same day.
 
 **Headers:**
 - `Authorization: Bearer {{access_token}}`
-- `X-Tenant-Domain: {{company_domain}}`
+
+**Note:** Tenant is resolved from authenticated user's email (from JWT token)
 
 **Response:**
 ```json
@@ -197,24 +200,34 @@ Same format as check-in. Must have checked in first on the same day.
 
 ## Tenant Resolution
 
-The API supports two methods for tenant resolution:
+Tenant is **automatically resolved from the user's email address**:
 
-### Method 1: Header (Recommended)
-Add header to all requests:
-- `X-Tenant-Domain: acme-corp`
-- OR `X-Tenant-ID: {clientId}`
+### How It Works
 
-### Method 2: Subdomain
-Use subdomain in URL:
-- `acme-corp.localhost:3000/auth/login`
+1. **Extract domain from email:**
+   - `john.doe@acme-corp.com` → Tenant domain: `acme-corp`
+   - `user@company.com` → Tenant domain: `company`
 
-The Postman collection uses **Method 1** (headers).
+2. **For different endpoints:**
+   - **Login/Setup Password:** Email is in the request body
+   - **Authenticated requests:** Email is extracted from JWT token (set during login)
+
+3. **No headers needed:** The `X-Tenant-Domain` header is no longer required!
+
+### Example Flow
+
+1. User logs in with `john.doe@acme-corp.com`
+2. System extracts `acme-corp` from email
+3. System resolves tenant organization
+4. System connects to tenant database
+5. Login succeeds, JWT token includes email
+6. All subsequent requests use email from JWT to resolve tenant
 
 ## Authentication
 
 All protected endpoints require:
 1. **JWT Token** in `Authorization` header: `Bearer {token}`
-2. **Tenant Identifier** in `X-Tenant-Domain` or `X-Tenant-ID` header
+2. **Tenant is automatically resolved** from the email address in the JWT token
 
 ## Role-Based Access
 

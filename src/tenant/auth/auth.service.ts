@@ -93,6 +93,7 @@ export class AuthService {
     setupPasswordDto: SetupPasswordDto,
     tenantId: string,
     tenantName: string,
+    rawToken: string,
   ): Promise<{ message: string }> {
     const UserSchema = new Schema(
       {
@@ -112,12 +113,18 @@ export class AuthService {
       UserSchema,
     );
 
+    // Find user by token (rawToken is passed as parameter)
     const user = await UserModel.findOne({
-      passwordSetupToken: setupPasswordDto.token,
+      passwordSetupToken: rawToken,
     });
 
     if (!user) {
       throw new NotFoundException('Invalid or expired token');
+    }
+
+    // If email provided in DTO, verify it matches the user's email
+    if (setupPasswordDto.email && user.email !== setupPasswordDto.email) {
+      throw new BadRequestException('Email does not match token');
     }
 
     if (user.passwordSetupTokenExpiry < new Date()) {

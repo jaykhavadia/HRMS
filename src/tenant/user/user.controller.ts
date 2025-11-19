@@ -2,16 +2,21 @@ import {
   Controller,
   Post,
   Get,
+  Put,
+  Delete,
   Body,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   Param,
   Query,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles/roles.guard';
 import { Roles } from '../../common/decorators/roles/roles.decorator';
@@ -35,6 +40,7 @@ export class UserController {
       createUserDto,
       tenant.clientId,
       tenant.clientName,
+      tenant.companyDomain,
     );
   }
 
@@ -50,6 +56,7 @@ export class UserController {
       file,
       tenant.clientId,
       tenant.clientName,
+      tenant.companyDomain,
     );
   }
 
@@ -89,5 +96,37 @@ export class UserController {
     }
 
     return this.userService.getUserById(id, tenant.clientId, tenant.clientName);
+  }
+
+  @Put(':id')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async updateUser(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @Tenant() tenant: any,
+  ) {
+    return this.userService.updateUser(
+      id,
+      updateUserDto,
+      tenant.clientId,
+      tenant.clientName,
+      tenant.companyDomain,
+    );
+  }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @HttpCode(HttpStatus.OK)
+  async deleteUser(
+    @Param('id') id: string,
+    @Tenant() tenant: any,
+  ) {
+    return this.userService.deleteUser(
+      id,
+      tenant.clientId,
+      tenant.clientName,
+    );
   }
 }

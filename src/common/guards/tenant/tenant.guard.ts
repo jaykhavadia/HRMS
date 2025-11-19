@@ -5,6 +5,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { TenantService } from '../../../core/tenant/tenant.service';
+import { extractTenantDomainFromEmail } from '../../utils/email.util';
+import { decodeTokenWithTenant } from '../../utils/token.util';
 
 @Injectable()
 export class TenantGuard implements CanActivate {
@@ -13,30 +15,46 @@ export class TenantGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
-    // Try to get tenant identifier from header first, then subdomain
-    let tenantIdentifier =
-      request.headers['x-tenant-id'] || request.headers['x-tenant-domain'];
+    let tenantDomain: string;
 
-    if (!tenantIdentifier) {
-      // Extract from subdomain
-      const host = request.headers.host || '';
-      const parts = host.split('.');
-      if (parts.length > 2) {
-        tenantIdentifier = parts[0];
-      }
+    // Priority 1: Get tenant from authenticated user (JWT token)
+    if (request.user && request.user.email) {
+      tenantDomain = extractTenantDomainFromEmail(request.user.email);
     }
-
-    if (!tenantIdentifier) {
-      throw new BadRequestException('Tenant identifier is required');
+    // Priority 2: Get tenant from password setup token (for setup-password endpoint)
+    else if (
+      request.body &&
+      request.body.token &&
+      request.url?.includes('setup-password')
+    ) {
+      const decoded = decodeTokenWithTenant(request.body.token);
+      if (!decoded) {
+        throw new BadRequestException('Invalid token format');
+      }
+      tenantDomain = decoded.tenantDomain;
+      // Store decoded token in request for later use
+      request.decodedToken = decoded.token;
+    }
+    // Priority 3: Get tenant from request body email (for login)
+    else if (request.body && request.body.email) {
+      tenantDomain = extractTenantDomainFromEmail(request.body.email);
+    }
+    // Priority 4: Get tenant from query parameter email
+    else if (request.query && request.query.email) {
+      tenantDomain = extractTenantDomainFromEmail(request.query.email);
+    }
+    else {
+      throw new BadRequestException(
+        'Unable to determine tenant. Email address or valid token is required.',
+      );
     }
 
     // Resolve tenant and attach to request
-    const organization = await this.tenantService.resolveTenant(
-      tenantIdentifier as string,
-    );
+    const organization = await this.tenantService.resolveTenant(tenantDomain);
     request.tenant = organization;
     request.tenantId = organization.clientId;
     request.tenantName = organization.clientName;
+    request.tenantDomain = tenantDomain;
 
     return true;
   }

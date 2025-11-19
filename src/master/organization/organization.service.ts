@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -12,6 +13,11 @@ import { DatabaseService } from '../../core/database/database.service';
 import { EmailService } from '../../shared/email/email.service';
 import { ConfigService } from '../../config/config.service';
 import { Schema } from 'mongoose';
+import { encodeTokenWithTenant } from '../../common/utils/token.util';
+import {
+  validateEmailDomain,
+  extractTenantDomainFromEmail,
+} from '../../common/utils/email.util';
 
 @Injectable()
 export class OrganizationService {
@@ -26,6 +32,20 @@ export class OrganizationService {
   async registerOrganization(
     dto: RegisterOrganizationDto,
   ): Promise<Organization> {
+    // Validate companyEmail domain matches companyDomain
+    if (!validateEmailDomain(dto.companyEmail, dto.companyDomain)) {
+      throw new BadRequestException(
+        `Company email domain must match company domain. Expected domain: ${dto.companyDomain}, but got: ${extractTenantDomainFromEmail(dto.companyEmail)}`,
+      );
+    }
+
+    // Validate adminEmail domain matches companyDomain (if provided)
+    if (dto.adminEmail && !validateEmailDomain(dto.adminEmail, dto.companyDomain)) {
+      throw new BadRequestException(
+        `Admin email domain must match company domain. Expected domain: ${dto.companyDomain}, but got: ${extractTenantDomainFromEmail(dto.adminEmail)}`,
+      );
+    }
+
     // Check if domain or email already exists
     const existingOrg = await this.organizationModel.findOne({
       $or: [
@@ -69,6 +89,7 @@ export class OrganizationService {
         await this.createAdminUser(
           clientId,
           clientName,
+          dto.companyDomain,
           dto.adminEmail,
           dto.adminFirstName || 'Admin',
           dto.adminLastName || 'User',
@@ -95,6 +116,7 @@ export class OrganizationService {
   private async createAdminUser(
     clientId: string,
     clientName: string,
+    companyDomain: string,
     email: string,
     firstName: string,
     lastName: string,
@@ -127,7 +149,8 @@ export class OrganizationService {
     );
 
     // Generate password setup token
-    const passwordSetupToken = uuidv4();
+    const rawToken = uuidv4();
+    const passwordSetupToken = encodeTokenWithTenant(companyDomain, rawToken);
     const passwordSetupTokenExpiry = new Date();
     passwordSetupTokenExpiry.setHours(passwordSetupTokenExpiry.getHours() + 24);
 
@@ -138,13 +161,13 @@ export class OrganizationService {
       role: 'admin',
       status: 'active',
       isPasswordSet: false,
-      passwordSetupToken,
+      passwordSetupToken: rawToken, // Store raw token in DB
       passwordSetupTokenExpiry,
     });
 
     await adminUser.save();
 
-    // Send password setup email
+    // Send password setup email with encoded token
     const frontendUrl = this.configService.getFrontendUrl();
     const setupUrl = `${frontendUrl}#/setup-password?token=${passwordSetupToken}`;
 
