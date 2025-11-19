@@ -42,18 +42,19 @@ export class AttendanceService {
 
   /**
    * Validate if location is within office radius
+   * Returns object with isValid flag and distance/radius info
    */
   private validateLocation(
     latitude: number,
     longitude: number,
     officeLocation: any,
-  ): boolean {
+  ): { isValid: boolean; distance?: number; radius?: number } {
     if (
       !officeLocation ||
       !officeLocation.latitude ||
       !officeLocation.longitude
     ) {
-      return false;
+      return { isValid: false };
     }
 
     const distance = this.calculateDistance(
@@ -65,7 +66,12 @@ export class AttendanceService {
 
     const radius =
       officeLocation.radius || this.configService.getOfficeLocationRadius();
-    return distance <= radius;
+    
+    return {
+      isValid: distance <= radius,
+      distance: Math.round(distance), // Round to nearest meter
+      radius: radius,
+    };
   }
 
   async checkIn(
@@ -77,15 +83,17 @@ export class AttendanceService {
     officeLocation: any,
   ): Promise<any> {
     // Validate location
-    if (
-      !this.validateLocation(
-        checkInDto.latitude,
-        checkInDto.longitude,
-        officeLocation,
-      )
-    ) {
+    const locationValidation = this.validateLocation(
+      checkInDto.latitude,
+      checkInDto.longitude,
+      officeLocation,
+    );
+
+    if (!locationValidation.isValid) {
+      const distance = locationValidation.distance || 0;
+      const radius = locationValidation.radius || 100;
       throw new BadRequestException(
-        'You are not within the office location radius',
+        `You are not within the office location radius. Your distance: ${distance}m, Allowed radius: ${radius}m`,
       );
     }
 
@@ -153,15 +161,17 @@ export class AttendanceService {
     officeLocation: any,
   ): Promise<any> {
     // Validate location
-    if (
-      !this.validateLocation(
-        checkInDto.latitude,
-        checkInDto.longitude,
-        officeLocation,
-      )
-    ) {
+    const locationValidation = this.validateLocation(
+      checkInDto.latitude,
+      checkInDto.longitude,
+      officeLocation,
+    );
+
+    if (!locationValidation.isValid) {
+      const distance = locationValidation.distance || 0;
+      const radius = locationValidation.radius || 100;
       throw new BadRequestException(
-        'You are not within the office location radius',
+        `You are not within the office location radius. Your distance: ${distance}m, Allowed radius: ${radius}m`,
       );
     }
 
