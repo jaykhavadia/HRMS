@@ -1,12 +1,15 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CheckInDto {
   @IsNotEmpty()
-  @IsNumber()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'latitude must be a number' })
   latitude: number;
 
   @IsNotEmpty()
-  @IsNumber()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'longitude must be a number' })
   longitude: number;
 
   @IsOptional()

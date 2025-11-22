@@ -218,7 +218,6 @@ export class UserService {
   async getAllUsers(
     tenantId: string,
     tenantName: string,
-    role?: string,
   ): Promise<any[]> {
     const UserModel = await this.databaseService.getTenantModel(
       tenantId,
@@ -227,12 +226,7 @@ export class UserService {
       UserSchema,
     );
 
-    const query: any = {};
-    if (role) {
-      query.role = role;
-    }
-
-    const users = await UserModel.find(query)
+    const users = await UserModel.find({})
       .select('-password -passwordSetupToken -passwordSetupTokenExpiry')
       .lean();
 

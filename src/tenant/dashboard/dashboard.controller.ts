@@ -7,7 +7,7 @@ import { TenantGuard } from '../../common/guards/tenant/tenant.guard';
 import { Tenant } from '../../common/decorators/tenant/tenant.decorator';
 
 @Controller('dashboard')
-@UseGuards(TenantGuard, JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @Roles('admin')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}

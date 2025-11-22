@@ -7,24 +7,34 @@ import {
   UseInterceptors,
   UploadedFile,
   Query,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AttendanceService } from './attendance.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles/roles.guard';
-import { Roles } from '../../common/decorators/roles/roles.decorator';
 import { TenantGuard } from '../../common/guards/tenant/tenant.guard';
 import { Tenant } from '../../common/decorators/tenant/tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user/current-user.decorator';
 
 @Controller('attendance')
-@UseGuards(TenantGuard, JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Post('check-in')
   @UseInterceptors(FileInterceptor('selfie'))
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: false, // Allow file fields that are not in DTO
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  )
   async checkIn(
     @Body() checkInDto: CheckInDto,
     @UploadedFile() selfieFile: Express.Multer.File,
@@ -43,6 +53,16 @@ export class AttendanceController {
 
   @Post('check-out')
   @UseInterceptors(FileInterceptor('selfie'))
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: false, // Allow file fields that are not in DTO
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  )
   async checkOut(
     @Body() checkInDto: CheckInDto,
     @UploadedFile() selfieFile: Express.Multer.File,

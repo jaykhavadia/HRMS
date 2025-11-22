@@ -9,7 +9,6 @@ import {
   UseInterceptors,
   UploadedFile,
   Param,
-  Query,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -25,7 +24,7 @@ import { Tenant } from '../../common/decorators/tenant/tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user/current-user.decorator';
 
 @Controller('user')
-@UseGuards(TenantGuard, JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -61,18 +60,10 @@ export class UserController {
   }
 
   @Get()
-  async getAllUsers(
-    @Tenant() tenant: any,
-    @CurrentUser() user: any,
-    @Query('role') role?: string,
-  ) {
+  async getAllUsers(@Tenant() tenant: any, @CurrentUser() user: any) {
     // Admin can see all users, employee can only see their own
     if (user.role === 'admin') {
-      return this.userService.getAllUsers(
-        tenant.clientId,
-        tenant.clientName,
-        role,
-      );
+      return this.userService.getAllUsers(tenant.clientId, tenant.clientName);
     } else {
       return [
         await this.userService.getUserById(
@@ -119,14 +110,7 @@ export class UserController {
   @UseGuards(RolesGuard)
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
-  async deleteUser(
-    @Param('id') id: string,
-    @Tenant() tenant: any,
-  ) {
-    return this.userService.deleteUser(
-      id,
-      tenant.clientId,
-      tenant.clientName,
-    );
+  async deleteUser(@Param('id') id: string, @Tenant() tenant: any) {
+    return this.userService.deleteUser(id, tenant.clientId, tenant.clientName);
   }
 }

@@ -89,7 +89,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["auth", "login"]
 						},
-						"description": "Login with email and password. Tenant is automatically resolved from email domain (e.g., acme-corp from john@acme-corp.com). Returns JWT token."
+						"description": "Login with email and password. Tenant is automatically resolved from email domain (e.g., 'acme-corp' from 'john@acme-corp.com'). Returns JWT token with user info including email, which is used for tenant resolution in subsequent requests."
 					},
 					"response": []
 				},
@@ -112,7 +112,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["auth", "setup-password"]
 						},
-						"description": "Set password using token received via email. Token format: 'tenantDomain:token' (e.g., 'acme-corp:token'). Email is optional."
+						"description": "Set password using token received via email. Token format: 'tenantDomain:token' (e.g., 'acme-corp:token'). Tenant is automatically resolved from the token itself - no email needed in request body."
 					},
 					"response": []
 				}
@@ -149,7 +149,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user"]
 						},
-						"description": "Create a new user. Admin only. Tenant is resolved from authenticated user's email. Password setup email will be sent.\n\n**Important:**\n- User email domain MUST match organization domain (e.g., if org domain is 'acme-corp', email must be '@acme-corp.com')\n- Role can only be 'employee' (admin role is not allowed - only one admin per organization)\n- If role is not provided, defaults to 'employee'"
+						"description": "Create a new user. Admin only. Tenant is resolved from authenticated user's email (from JWT token). Password setup email will be sent.\n\n**Important:**\n- User email domain MUST match organization domain (e.g., if org domain is 'acme-corp', email must be '@acme-corp.com')\n- Role can only be 'employee' (admin role is not allowed - only one admin per organization, created during registration)\n- If role is not provided or set to 'admin', it will be forced to 'employee'"
 					},
 					"response": []
 				},
@@ -179,7 +179,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user", "bulk-upload"]
 						},
-						"description": "Bulk upload users from Excel file. Admin only. Tenant is resolved from authenticated user's email.\n\n**Excel Format:**\n- Columns: First Name, Last Name, Email, Mobile Number, Role, Status\n- All user emails MUST match organization domain (e.g., if org domain is 'acme-corp', emails must be '@acme-corp.com')\n- Role can only be 'employee' (admin role will be rejected - only one admin per organization)\n- Invalid rows will be skipped with error messages showing row numbers"
+						"description": "Bulk upload users from Excel file. Admin only. Tenant is resolved from authenticated user's email (from JWT token).\n\n**Excel Format:**\n- Columns: First Name, Last Name, Email, Mobile Number, Role, Status\n- All user emails MUST match organization domain (e.g., if org domain is 'acme-corp', emails must be '@acme-corp.com')\n- Role can only be 'employee' (admin role will be rejected - only one admin per organization, created during registration)\n- Invalid rows will be skipped with error messages showing row numbers"
 					},
 					"response": []
 				},
@@ -194,18 +194,11 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/user?role=employee",
+							"raw": "{{base_url}}/user",
 							"host": ["{{base_url}}"],
-							"path": ["user"],
-							"query": [
-								{
-									"key": "role",
-									"value": "employee",
-									"description": "Filter by role (admin/employee). Optional."
-								}
-							]
+							"path": ["user"]
 						},
-						"description": "Get all users. Tenant is resolved from authenticated user's email. Admin sees all, employee sees only own profile."
+						"description": "Get all users. Tenant is resolved from authenticated user's email (from JWT token). Admin sees all users, employee sees only their own profile. No query parameters needed - role is determined from authenticated user's token."
 					},
 					"response": []
 				},
@@ -231,7 +224,7 @@
 								}
 							]
 						},
-						"description": "Get user by ID. Tenant is resolved from authenticated user's email. Employees can only view their own profile."
+						"description": "Get user by ID. Tenant is resolved from authenticated user's email (from JWT token). Employees can only view their own profile."
 					},
 					"response": []
 				},
@@ -270,7 +263,7 @@
 								}
 							]
 						},
-						"description": "Update user information. Admin only. Tenant is resolved from authenticated user's email.\n\n**Important:**\n- Admin user CANNOT be updated (protected)\n- User email domain MUST match organization domain if email is being updated\n- Role cannot be updated (immutable)\n- All fields are optional - only provided fields will be updated"
+						"description": "Update user information. Admin only. Tenant is resolved from authenticated user's email (from JWT token).\n\n**Important:**\n- Admin user CANNOT be updated (protected - only one admin per organization)\n- User email domain MUST match organization domain if email is being updated\n- Role cannot be updated (immutable)\n- All fields are optional - only provided fields will be updated"
 					},
 					"response": []
 				},
@@ -296,7 +289,7 @@
 								}
 							]
 						},
-						"description": "Delete a user. Admin only. Tenant is resolved from authenticated user's email.\n\n**Important:**\n- Admin user CANNOT be deleted (protected)\n- Only employee users can be deleted"
+						"description": "Delete a user. Admin only. Tenant is resolved from authenticated user's email (from JWT token).\n\n**Important:**\n- Admin user CANNOT be deleted (protected - only one admin per organization)\n- Only employee users can be deleted"
 					},
 					"response": []
 				}
@@ -349,7 +342,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["attendance", "check-in"]
 						},
-						"description": "Check in with selfie and location. Tenant is resolved from authenticated user's email. Location must be within office radius."
+						"description": "Check in with selfie and location. Uses form-data (multipart/form-data). Tenant is resolved from authenticated user's email (from JWT token). Location must be within office radius (default 100m).\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (required) - Selfie image (JPEG/PNG, max 5MB)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
 					},
 					"response": []
 				},
@@ -393,7 +386,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["attendance", "check-out"]
 						},
-						"description": "Check out with selfie and location. Tenant is resolved from authenticated user's email. Must have checked in first."
+						"description": "Check out with selfie and location. Uses form-data (multipart/form-data). Tenant is resolved from authenticated user's email (from JWT token). Location must be within office radius (default 100m). Must have checked in first.\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (required) - Selfie image (JPEG/PNG, max 5MB)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
 					},
 					"response": []
 				},
@@ -429,7 +422,7 @@
 								}
 							]
 						},
-						"description": "Get attendance records. Tenant is resolved from authenticated user's email. Admin can filter by userId, employees see only own records."
+						"description": "Get attendance records. Tenant is resolved from authenticated user's email (from JWT token). Admin can filter by userId, employees see only own records."
 					},
 					"response": []
 				}
@@ -453,7 +446,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["dashboard", "stats"]
 						},
-						"description": "Get dashboard statistics. Tenant is resolved from authenticated user's email. Admin only. Returns user stats, attendance stats, and recent records."
+						"description": "Get dashboard statistics. Tenant is resolved from authenticated user's email (from JWT token). Admin only. Returns user stats, attendance stats, and recent records."
 					},
 					"response": []
 				}
