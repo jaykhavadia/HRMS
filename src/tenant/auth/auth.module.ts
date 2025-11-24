@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt/jwt';
 import { ConfigService } from '../../config/config.service';
 import { DatabaseModule } from '../../core/database/database.module';
-import { TenantModule } from '../../core/tenant/tenant.module';
+import { User, UserSchema } from '../user/schemas/user.schema';
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { TenantModule } from '../../core/tenant/tenant.module';
       inject: [ConfigService],
     }),
     DatabaseModule,
-    TenantModule,
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

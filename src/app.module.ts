@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from './config/config.module';
-import { TenantModule } from './core/tenant/tenant.module';
 import { DatabaseModule } from './core/database/database.module';
 import { OrganizationModule } from './master/organization/organization.module';
 import { SubscriptionModule } from './master/subscription/subscription.module';
@@ -13,11 +12,11 @@ import { UserModule } from './tenant/user/user.module';
 import { AttendanceModule } from './tenant/attendance/attendance.module';
 import { DashboardModule } from './tenant/dashboard/dashboard.module';
 import { CommonModule } from './common/common.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule,
-    TenantModule,
     DatabaseModule,
     OrganizationModule,
     SubscriptionModule,
@@ -28,6 +27,7 @@ import { CommonModule } from './common/common.module';
     AttendanceModule,
     DashboardModule,
     CommonModule,
+    ScheduleModule.forRoot(), // For background jobs
   ],
   controllers: [AppController],
   providers: [AppService],

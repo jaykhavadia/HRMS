@@ -1,18 +1,22 @@
 import {
   Injectable,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
-import { DatabaseService } from '../../core/database/database.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Attendance } from './schemas/attendance.schema';
+import { Organization } from '../../master/organization/schemas/organization.schema';
 import { FileUploadService } from '../../shared/file-upload/file-upload.service';
 import { ConfigService } from '../../config/config.service';
-import { AttendanceSchema } from './schemas/attendance.schema';
 import { CheckInDto } from './dto/check-in.dto';
 
 @Injectable()
 export class AttendanceService {
   constructor(
-    private databaseService: DatabaseService,
+    @InjectModel(Attendance.name)
+    private attendanceModel: Model<Attendance>,
+    @InjectModel(Organization.name)
+    private organizationModel: Model<Organization>,
     private fileUploadService: FileUploadService,
     private configService: ConfigService,
   ) {}
@@ -42,34 +46,24 @@ export class AttendanceService {
 
   /**
    * Validate if location is within office radius
-   * Returns object with isValid flag and distance/radius info
    */
   private validateLocation(
     latitude: number,
     longitude: number,
-    officeLocation: any,
+    officeLatitude: number,
+    officeLongitude: number,
+    radius: number,
   ): { isValid: boolean; distance?: number; radius?: number } {
-    if (
-      !officeLocation ||
-      !officeLocation.latitude ||
-      !officeLocation.longitude
-    ) {
-      return { isValid: false };
-    }
-
     const distance = this.calculateDistance(
       latitude,
       longitude,
-      officeLocation.latitude,
-      officeLocation.longitude,
+      officeLatitude,
+      officeLongitude,
     );
 
-    const radius =
-      officeLocation.radius || this.configService.getOfficeLocationRadius();
-    
     return {
       isValid: distance <= radius,
-      distance: Math.round(distance), // Round to nearest meter
+      distance: Math.round(distance),
       radius: radius,
     };
   }
@@ -78,15 +72,21 @@ export class AttendanceService {
     userId: string,
     checkInDto: CheckInDto,
     selfieFile: Express.Multer.File,
-    tenantId: string,
-    tenantName: string,
-    officeLocation: any,
+    organizationId: string,
   ): Promise<any> {
+    // Get organization to get office location
+    const organization = await this.organizationModel.findById(organizationId);
+    if (!organization) {
+      throw new BadRequestException('Organization not found');
+    }
+
     // Validate location
     const locationValidation = this.validateLocation(
       checkInDto.latitude,
       checkInDto.longitude,
-      officeLocation,
+      organization.latitude,
+      organization.longitude,
+      organization.radius,
     );
 
     if (!locationValidation.isValid) {
@@ -103,19 +103,13 @@ export class AttendanceService {
       userId,
     );
 
-    const AttendanceModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'Attendance',
-      AttendanceSchema,
-    );
-
     // Check if already checked in today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const existingAttendance = await AttendanceModel.findOne({
+    const existingAttendance = await this.attendanceModel.findOne({
       userId,
+      organizationId,
       date: {
         $gte: today,
         $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
@@ -128,8 +122,9 @@ export class AttendanceService {
 
     const attendance = existingAttendance
       ? existingAttendance
-      : new AttendanceModel({
+      : new this.attendanceModel({
           userId,
+          organizationId,
           date: today,
         });
 
@@ -137,7 +132,7 @@ export class AttendanceService {
     attendance.checkInLocation = {
       latitude: checkInDto.latitude,
       longitude: checkInDto.longitude,
-      address: checkInDto.address,
+      address: checkInDto.address || '',
     };
     attendance.checkInSelfie = selfiePath;
     attendance.status = 'checked-in';
@@ -156,15 +151,21 @@ export class AttendanceService {
     userId: string,
     checkInDto: CheckInDto,
     selfieFile: Express.Multer.File,
-    tenantId: string,
-    tenantName: string,
-    officeLocation: any,
+    organizationId: string,
   ): Promise<any> {
+    // Get organization to get office location
+    const organization = await this.organizationModel.findById(organizationId);
+    if (!organization) {
+      throw new BadRequestException('Organization not found');
+    }
+
     // Validate location
     const locationValidation = this.validateLocation(
       checkInDto.latitude,
       checkInDto.longitude,
-      officeLocation,
+      organization.latitude,
+      organization.longitude,
+      organization.radius,
     );
 
     if (!locationValidation.isValid) {
@@ -181,19 +182,13 @@ export class AttendanceService {
       userId,
     );
 
-    const AttendanceModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'Attendance',
-      AttendanceSchema,
-    );
-
     // Find today's attendance
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const attendance = await AttendanceModel.findOne({
+    const attendance = await this.attendanceModel.findOne({
       userId,
+      organizationId,
       date: {
         $gte: today,
         $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
@@ -212,7 +207,7 @@ export class AttendanceService {
     attendance.checkOutLocation = {
       latitude: checkInDto.latitude,
       longitude: checkInDto.longitude,
-      address: checkInDto.address,
+      address: checkInDto.address || '',
     };
     attendance.checkOutSelfie = selfiePath;
     attendance.status = 'checked-out';
@@ -235,19 +230,12 @@ export class AttendanceService {
 
   async getAttendanceRecords(
     userId: string | null,
-    tenantId: string,
-    tenantName: string,
+    organizationId: string,
     startDate?: Date,
     endDate?: Date,
   ): Promise<any[]> {
-    const AttendanceModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'Attendance',
-      AttendanceSchema,
-    );
-
-    const query: any = {};
+    const query: any = { organizationId };
+    
     if (userId) {
       query.userId = userId;
     }
@@ -262,12 +250,13 @@ export class AttendanceService {
       }
     }
 
-    const records = await AttendanceModel.find(query)
+    const records = await this.attendanceModel
+      .find(query)
       .populate('userId', 'firstName lastName email')
       .sort({ date: -1, checkInTime: -1 })
       .lean();
 
-    return records.map((record) => ({
+    return records.map((record: any) => ({
       id: record._id.toString(),
       userId: record.userId,
       date: record.date,

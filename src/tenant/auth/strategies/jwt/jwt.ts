@@ -1,15 +1,17 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { ConfigService } from '../../../../config/config.service';
-import { DatabaseService } from '../../../../core/database/database.service';
-import { Schema } from 'mongoose';
+import { User } from '../../../user/schemas/user.schema';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
-    private databaseService: DatabaseService,
+    @InjectModel(User.name)
+    private userModel: Model<User>,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -19,28 +21,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    const { userId, tenantId, tenantName, email } = payload;
+    const { userId, organizationId } = payload;
 
-    // Get user from tenant database
-    const UserSchema = new Schema(
-      {
-        email: String,
-        firstName: String,
-        lastName: String,
-        role: String,
-        status: String,
-      },
-      { strict: false },
-    );
-
-    const UserModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'User',
-      UserSchema,
-    );
-
-    const user = await UserModel.findById(userId).lean();
+    const user = await this.userModel.findById(userId).lean();
 
     if (!user || user.status !== 'active') {
       throw new UnauthorizedException('User not found or inactive');
@@ -52,8 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
-      tenantId,
-      tenantName,
+      organizationId: user.organizationId.toString(),
     };
   }
 }

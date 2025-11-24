@@ -1,40 +1,31 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../../core/database/database.service';
-import { UserService } from '../user/user.service';
-import { AttendanceService } from '../attendance/attendance.service';
-import { UserSchema } from '../user/schemas/user.schema';
-import { AttendanceSchema } from '../attendance/schemas/attendance.schema';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User } from '../user/schemas/user.schema';
+import { Attendance } from '../attendance/schemas/attendance.schema';
 
 @Injectable()
 export class DashboardService {
   constructor(
-    private databaseService: DatabaseService,
-    private userService: UserService,
-    private attendanceService: AttendanceService,
+    @InjectModel(User.name)
+    private userModel: Model<User>,
+    @InjectModel(Attendance.name)
+    private attendanceModel: Model<Attendance>,
   ) {}
 
-  async getDashboardStats(tenantId: string, tenantName: string): Promise<any> {
-    const UserModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'User',
-      UserSchema,
-    );
-
-    const AttendanceModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'Attendance',
-      AttendanceSchema,
-    );
-
-    // Get total users
-    const totalUsers = await UserModel.countDocuments({ status: 'active' });
-    const totalAdmins = await UserModel.countDocuments({
+  async getDashboardStats(organizationId: string): Promise<any> {
+    // Get total users for this organization
+    const totalUsers = await this.userModel.countDocuments({
+      organizationId,
+      status: 'active',
+    });
+    const totalAdmins = await this.userModel.countDocuments({
+      organizationId,
       role: 'admin',
       status: 'active',
     });
-    const totalEmployees = await UserModel.countDocuments({
+    const totalEmployees = await this.userModel.countDocuments({
+      organizationId,
       role: 'employee',
       status: 'active',
     });
@@ -45,12 +36,14 @@ export class DashboardService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const todayCheckedIn = await AttendanceModel.countDocuments({
+    const todayCheckedIn = await this.attendanceModel.countDocuments({
+      organizationId,
       date: { $gte: today, $lt: tomorrow },
       checkInTime: { $exists: true },
     });
 
-    const todayCheckedOut = await AttendanceModel.countDocuments({
+    const todayCheckedOut = await this.attendanceModel.countDocuments({
+      organizationId,
       date: { $gte: today, $lt: tomorrow },
       checkOutTime: { $exists: true },
     });
@@ -59,22 +52,27 @@ export class DashboardService {
     const weekStart = new Date(today);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week (Sunday)
 
-    const weekAttendance = await AttendanceModel.countDocuments({
+    const weekAttendance = await this.attendanceModel.countDocuments({
+      organizationId,
       date: { $gte: weekStart, $lt: tomorrow },
     });
 
     // Get this month's attendance
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    const monthAttendance = await AttendanceModel.countDocuments({
+    const monthAttendance = await this.attendanceModel.countDocuments({
+      organizationId,
       date: { $gte: monthStart, $lt: tomorrow },
     });
 
     // Get average hours worked this month
-    const monthRecords = await AttendanceModel.find({
-      date: { $gte: monthStart, $lt: tomorrow },
-      totalHours: { $exists: true },
-    }).lean();
+    const monthRecords = await this.attendanceModel
+      .find({
+        organizationId,
+        date: { $gte: monthStart, $lt: tomorrow },
+        totalHours: { $exists: true },
+      })
+      .lean();
 
     const totalHours = monthRecords.reduce(
       (sum, record) => sum + (record.totalHours || 0),
@@ -84,7 +82,8 @@ export class DashboardService {
       monthRecords.length > 0 ? totalHours / monthRecords.length : 0;
 
     // Get recent attendance (last 10 records)
-    const recentAttendance = await AttendanceModel.find({})
+    const recentAttendance = await this.attendanceModel
+      .find({ organizationId })
       .populate('userId', 'firstName lastName email')
       .sort({ checkInTime: -1 })
       .limit(10)

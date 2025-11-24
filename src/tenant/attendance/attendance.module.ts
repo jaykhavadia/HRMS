@@ -1,13 +1,23 @@
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
+import { Attendance, AttendanceSchema } from './schemas/attendance.schema';
+import { Organization, OrganizationSchema } from '../../master/organization/schemas/organization.schema';
 import { DatabaseModule } from '../../core/database/database.module';
 import { FileUploadModule } from '../../shared/file-upload/file-upload.module';
 import { ConfigModule } from '../../config/config.module';
-import { TenantModule } from '../../core/tenant/tenant.module';
 
 @Module({
-  imports: [DatabaseModule, FileUploadModule, ConfigModule, TenantModule],
+  imports: [
+    DatabaseModule,
+    MongooseModule.forFeature([
+      { name: Attendance.name, schema: AttendanceSchema },
+      { name: Organization.name, schema: OrganizationSchema },
+    ]),
+    FileUploadModule,
+    ConfigModule,
+  ],
   controllers: [AttendanceController],
   providers: [AttendanceService],
   exports: [AttendanceService],

@@ -89,4 +89,36 @@ export class EmailService {
       throw error;
     }
   }
+
+  async sendOtpEmail(to: string, otp: string, companyName: string): Promise<void> {
+    const mailOptions = {
+      from: this.configService.get('EMAIL_USER'),
+      to,
+      subject: 'HRMS Registration - OTP Verification',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">OTP Verification</h2>
+          <p>Hello,</p>
+          <p>Thank you for registering <strong>${companyName}</strong> on HRMS.</p>
+          <p>Your OTP for verification is:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <div style="background-color: #f0f0f0; padding: 20px; border-radius: 5px; display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #007bff;">
+              ${otp}
+            </div>
+          </div>
+          <p><strong>Note:</strong> This OTP will expire in 15 minutes.</p>
+          <p>If you didn't request this registration, please ignore this email.</p>
+          <p>Best regards,<br>HRMS Team</p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      this.logger.log(`OTP email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(`Failed to send OTP email to ${to}:`, error);
+      throw error;
+    }
+  }
 }

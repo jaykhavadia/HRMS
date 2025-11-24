@@ -1,6 +1,5 @@
 import { Module, Global } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { DatabaseService } from './database.service';
 import { ConfigModule } from '../../config/config.module';
 import { ConfigService } from '../../config/config.service';
 
@@ -15,7 +14,6 @@ import { ConfigService } from '../../config/config.service';
       inject: [ConfigService],
     }),
   ],
-  providers: [DatabaseService],
-  exports: [DatabaseService],
+  exports: [MongooseModule],
 })
 export class DatabaseModule {}

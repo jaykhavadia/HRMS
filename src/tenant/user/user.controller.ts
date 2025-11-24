@@ -19,12 +19,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles/roles.guard';
 import { Roles } from '../../common/decorators/roles/roles.decorator';
-import { TenantGuard } from '../../common/guards/tenant/tenant.guard';
-import { Tenant } from '../../common/decorators/tenant/tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user/current-user.decorator';
 
 @Controller('user')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -33,13 +31,11 @@ export class UserController {
   @Roles('admin')
   async createUser(
     @Body() createUserDto: CreateUserDto,
-    @Tenant() tenant: any,
+    @CurrentUser() user: any,
   ) {
     return this.userService.createUser(
       createUserDto,
-      tenant.clientId,
-      tenant.clientName,
-      tenant.companyDomain,
+      user.organizationId,
     );
   }
 
@@ -49,44 +45,31 @@ export class UserController {
   @UseInterceptors(FileInterceptor('file'))
   async bulkUploadUsers(
     @UploadedFile() file: Express.Multer.File,
-    @Tenant() tenant: any,
+    @CurrentUser() user: any,
   ) {
-    return this.userService.bulkUploadUsers(
-      file,
-      tenant.clientId,
-      tenant.clientName,
-      tenant.companyDomain,
-    );
+    return this.userService.bulkUploadUsers(file, user.organizationId);
   }
 
   @Get()
-  async getAllUsers(@Tenant() tenant: any, @CurrentUser() user: any) {
-    // Admin can see all users, employee can only see their own
-    if (user.role === 'admin') {
-      return this.userService.getAllUsers(tenant.clientId, tenant.clientName);
-    } else {
-      return [
-        await this.userService.getUserById(
-          user.id,
-          tenant.clientId,
-          tenant.clientName,
-        ),
-      ];
-    }
+  async getAllUsers(@CurrentUser() user: any) {
+    return this.userService.getAllUsers(
+      user.organizationId,
+      user.role,
+      user.id,
+    );
   }
 
   @Get(':id')
   async getUserById(
     @Param('id') id: string,
-    @Tenant() tenant: any,
     @CurrentUser() user: any,
   ) {
-    // Employees can only view their own profile
-    if (user.role === 'employee' && user.id !== id) {
-      throw new Error('Unauthorized to view this user');
-    }
-
-    return this.userService.getUserById(id, tenant.clientId, tenant.clientName);
+    return this.userService.getUserById(
+      id,
+      user.organizationId,
+      user.id,
+      user.role,
+    );
   }
 
   @Put(':id')
@@ -95,14 +78,12 @@ export class UserController {
   async updateUser(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
-    @Tenant() tenant: any,
+    @CurrentUser() user: any,
   ) {
     return this.userService.updateUser(
       id,
       updateUserDto,
-      tenant.clientId,
-      tenant.clientName,
-      tenant.companyDomain,
+      user.organizationId,
     );
   }
 
@@ -110,7 +91,10 @@ export class UserController {
   @UseGuards(RolesGuard)
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
-  async deleteUser(@Param('id') id: string, @Tenant() tenant: any) {
-    return this.userService.deleteUser(id, tenant.clientId, tenant.clientName);
+  async deleteUser(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.userService.deleteUser(id, user.organizationId);
   }
 }

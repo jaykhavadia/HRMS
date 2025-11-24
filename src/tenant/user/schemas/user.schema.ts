@@ -1,20 +1,52 @@
-import { Schema } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document } from 'mongoose';
 
-export const UserSchema = new Schema(
-  {
-    email: { type: String, required: true, unique: true },
-    password: { type: String },
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
-    mobileNumber: { type: String },
-    role: { type: String, enum: ['admin', 'employee'], default: 'employee' },
-    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
-    isPasswordSet: { type: Boolean, default: false },
-    passwordSetupToken: { type: String },
-    passwordSetupTokenExpiry: { type: Date },
-  },
-  { timestamps: true },
-);
+export type UserDocument = User & Document;
 
-// Index is already created by unique: true above, so we don't need this
-// UserSchema.index({ email: 1 }, { unique: true });
+@Schema({ timestamps: true })
+export class User {
+  @Prop({ required: true, unique: true })
+  email: string;
+
+  @Prop()
+  password?: string; // Hashed password (optional - set via password setup for employees)
+
+  @Prop({ required: true })
+  firstName: string;
+
+  @Prop({ required: true })
+  lastName: string;
+
+  @Prop()
+  mobileNumber?: string;
+
+  @Prop({
+    type: String,
+    enum: ['admin', 'employee'],
+    default: 'employee',
+    required: true,
+  })
+  role: string;
+
+  @Prop({
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active',
+  })
+  status: string;
+
+  @Prop({ type: 'ObjectId', ref: 'Organization', required: true })
+  organizationId: string;
+
+  @Prop()
+  passwordSetupToken?: string;
+
+  @Prop()
+  passwordSetupTokenExpiry?: Date;
+}
+
+export const UserSchema = SchemaFactory.createForClass(User);
+
+// Index for organization queries
+UserSchema.index({ organizationId: 1 });
+UserSchema.index({ email: 1 }, { unique: true });

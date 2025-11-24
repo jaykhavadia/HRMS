@@ -10,7 +10,7 @@ export class ConfigService {
   }
 
   getMasterDbUri(): string {
-    return this.get('MASTER_DB_URI') || 'mongodb://localhost:27017/hrms-master';
+    return this.get('DB_URI') || 'mongodb://localhost:27017/hrms';
   }
 
   getJwtSecret(): string {

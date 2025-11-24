@@ -14,12 +14,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { AttendanceService } from './attendance.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth/jwt-auth.guard';
-import { TenantGuard } from '../../common/guards/tenant/tenant.guard';
-import { Tenant } from '../../common/decorators/tenant/tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user/current-user.decorator';
 
 @Controller('attendance')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard)
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
@@ -28,7 +26,7 @@ export class AttendanceController {
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: false, // Allow file fields that are not in DTO
+      forbidNonWhitelisted: false,
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,
@@ -38,16 +36,13 @@ export class AttendanceController {
   async checkIn(
     @Body() checkInDto: CheckInDto,
     @UploadedFile() selfieFile: Express.Multer.File,
-    @Tenant() tenant: any,
     @CurrentUser() user: any,
   ) {
     return this.attendanceService.checkIn(
       user.id,
       checkInDto,
       selfieFile,
-      tenant.clientId,
-      tenant.clientName,
-      tenant.officeLocation,
+      user.organizationId,
     );
   }
 
@@ -56,7 +51,7 @@ export class AttendanceController {
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: false, // Allow file fields that are not in DTO
+      forbidNonWhitelisted: false,
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,
@@ -66,22 +61,18 @@ export class AttendanceController {
   async checkOut(
     @Body() checkInDto: CheckInDto,
     @UploadedFile() selfieFile: Express.Multer.File,
-    @Tenant() tenant: any,
     @CurrentUser() user: any,
   ) {
     return this.attendanceService.checkOut(
       user.id,
       checkInDto,
       selfieFile,
-      tenant.clientId,
-      tenant.clientName,
-      tenant.officeLocation,
+      user.organizationId,
     );
   }
 
   @Get()
   async getAttendanceRecords(
-    @Tenant() tenant: any,
     @CurrentUser() user: any,
     @Query('userId') userId?: string,
     @Query('startDate') startDate?: string,
@@ -101,8 +92,7 @@ export class AttendanceController {
 
     return this.attendanceService.getAttendanceRecords(
       targetUserId || user.id,
-      tenant.clientId,
-      tenant.clientName,
+      user.organizationId,
       start,
       end,
     );

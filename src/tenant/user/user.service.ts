@@ -5,22 +5,22 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { DatabaseService } from '../../core/database/database.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User } from './schemas/user.schema';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { EmailService } from '../../shared/email/email.service';
 import { ConfigService } from '../../config/config.service';
 import { FileUploadService } from '../../shared/file-upload/file-upload.service';
-import { UserSchema } from './schemas/user.schema';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { v4 as uuidv4 } from 'uuid';
 import * as xlsx from 'xlsx';
-import { encodeTokenWithTenant } from '../../common/utils/token.util';
-import { validateEmailDomain } from '../../common/utils/email.util';
 
 @Injectable()
 export class UserService {
   constructor(
-    private databaseService: DatabaseService,
+    @InjectModel(User.name)
+    private userModel: Model<User>,
     private emailService: EmailService,
     private configService: ConfigService,
     private fileUploadService: FileUploadService,
@@ -28,24 +28,8 @@ export class UserService {
 
   async createUser(
     createUserDto: CreateUserDto,
-    tenantId: string,
-    tenantName: string,
-    tenantDomain: string,
+    organizationId: string,
   ): Promise<any> {
-    // Validate user email domain matches tenant domain
-    if (!validateEmailDomain(createUserDto.email, tenantDomain)) {
-      throw new BadRequestException(
-        `User email domain must match organization domain. Expected domain: ${tenantDomain}, but email domain is: ${createUserDto.email.split('@')[1] || 'invalid'}`,
-      );
-    }
-
-    const UserModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'User',
-      UserSchema,
-    );
-
     // Prevent creating additional admin users - only one admin allowed per organization
     if (createUserDto.role === 'admin') {
       throw new BadRequestException(
@@ -53,8 +37,8 @@ export class UserService {
       );
     }
 
-    // Check if user already exists
-    const existingUser = await UserModel.findOne({
+    // Check if user already exists (unique email across all organizations)
+    const existingUser = await this.userModel.findOne({
       email: createUserDto.email,
     });
 
@@ -64,25 +48,25 @@ export class UserService {
 
     // Generate password setup token
     const rawToken = uuidv4();
-    const encodedToken = encodeTokenWithTenant(tenantDomain, rawToken);
     const passwordSetupTokenExpiry = new Date();
     passwordSetupTokenExpiry.setHours(passwordSetupTokenExpiry.getHours() + 24);
 
     // Force role to 'employee' - admin role is not allowed for new users
-    const user = new UserModel({
+    const user = new this.userModel({
       ...createUserDto,
       role: 'employee', // Always set to employee - admin cannot be created
       status: createUserDto.status || 'active',
-      isPasswordSet: false,
-      passwordSetupToken: rawToken, // Store raw token in DB
+      organizationId,
+      // password is optional - will be set via password setup
+      passwordSetupToken: rawToken,
       passwordSetupTokenExpiry,
     });
 
     await user.save();
 
-    // Send password setup email with encoded token
+    // Send password setup email
     const frontendUrl = this.configService.getFrontendUrl();
-    const setupUrl = `${frontendUrl}#/setup-password?token=${encodedToken}`;
+    const setupUrl = `${frontendUrl}#/setup-password?token=${rawToken}&email=${createUserDto.email}`;
 
     await this.emailService.sendPasswordSetupEmail(
       createUserDto.email,
@@ -102,9 +86,7 @@ export class UserService {
 
   async bulkUploadUsers(
     file: Express.Multer.File,
-    tenantId: string,
-    tenantName: string,
-    tenantDomain: string,
+    organizationId: string,
   ): Promise<{ success: number; failed: number; errors: any[] }> {
     if (!file) {
       throw new BadRequestException('Excel file is required');
@@ -119,13 +101,6 @@ export class UserService {
     if (data.length === 0) {
       throw new BadRequestException('Excel file is empty');
     }
-
-    const UserModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'User',
-      UserSchema,
-    );
 
     let success = 0;
     let failed = 0;
@@ -152,13 +127,6 @@ export class UserService {
           );
         }
 
-        // Validate user email domain matches tenant domain
-        if (!validateEmailDomain(userData.email, tenantDomain)) {
-          throw new Error(
-            `User email domain must match organization domain. Row ${i + 2}: ${userData.email} does not match domain ${tenantDomain}`,
-          );
-        }
-
         // Prevent creating admin users in bulk upload - only one admin allowed
         if (userData.role === 'admin') {
           throw new Error(
@@ -166,34 +134,36 @@ export class UserService {
           );
         }
 
-        // Check if user exists
-        const existingUser = await UserModel.findOne({ email: userData.email });
+        // Check if user exists (unique email)
+        const existingUser = await this.userModel.findOne({
+          email: userData.email,
+        });
         if (existingUser) {
           throw new Error('User with this email already exists');
         }
 
         // Generate password setup token
         const rawToken = uuidv4();
-        const encodedToken = encodeTokenWithTenant(tenantDomain, rawToken);
         const passwordSetupTokenExpiry = new Date();
         passwordSetupTokenExpiry.setHours(
           passwordSetupTokenExpiry.getHours() + 24,
         );
 
         // Force role to 'employee' - admin role is not allowed
-        const user = new UserModel({
+        const user = new this.userModel({
           ...userData,
           role: 'employee', // Always set to employee - admin cannot be created
-          isPasswordSet: false,
-          passwordSetupToken: rawToken, // Store raw token in DB
+          organizationId,
+          // password is optional - will be set via password setup
+          passwordSetupToken: rawToken,
           passwordSetupTokenExpiry,
         });
 
         await user.save();
 
-        // Send password setup email with encoded token
+        // Send password setup email
         const frontendUrl = this.configService.getFrontendUrl();
-        const setupUrl = `${frontendUrl}#/setup-password?token=${encodedToken}`;
+        const setupUrl = `${frontendUrl}#/setup-password?token=${rawToken}&email=${userData.email}`;
 
         await this.emailService.sendPasswordSetupEmail(
           userData.email,
@@ -216,21 +186,20 @@ export class UserService {
   }
 
   async getAllUsers(
-    tenantId: string,
-    tenantName: string,
+    organizationId: string,
+    userRole: string,
+    userId: string,
   ): Promise<any[]> {
-    const UserModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'User',
-      UserSchema,
-    );
+    const query: any = { organizationId };
 
-    const users = await UserModel.find({})
-      .select('-password -passwordSetupToken -passwordSetupTokenExpiry')
-      .lean();
+    // Employees can only see their own profile
+    if (userRole === 'employee') {
+      query._id = userId;
+    }
 
-    return users.map((user) => ({
+    const users = await this.userModel.find(query).select('-password').lean();
+
+    return users.map((user: any) => ({
       id: user._id.toString(),
       email: user.email,
       firstName: user.firstName,
@@ -238,7 +207,7 @@ export class UserService {
       mobileNumber: user.mobileNumber,
       role: user.role,
       status: user.status,
-      isPasswordSet: user.isPasswordSet,
+      organizationId: user.organizationId.toString(),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     }));
@@ -246,24 +215,30 @@ export class UserService {
 
   async getUserById(
     userId: string,
-    tenantId: string,
-    tenantName: string,
+    organizationId: string,
+    currentUserId: string,
+    currentUserRole: string,
   ): Promise<any> {
-    const UserModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'User',
-      UserSchema,
-    );
-
-    const user = await UserModel.findById(userId)
-      .select('-password -passwordSetupToken -passwordSetupTokenExpiry')
-      .lean();
+    const user = await this.userModel.findById(userId).lean();
 
     if (!user) {
-      throw new BadRequestException('User not found');
+      throw new NotFoundException('User not found');
     }
 
+    // Check if user belongs to same organization
+    if (user.organizationId.toString() !== organizationId) {
+      throw new ForbiddenException('User does not belong to your organization');
+    }
+
+    // Employees can only view their own profile
+    if (
+      currentUserRole === 'employee' &&
+      user._id.toString() !== currentUserId
+    ) {
+      throw new ForbiddenException('You can only view your own profile');
+    }
+
+    const userAny = user as any;
     return {
       id: user._id.toString(),
       email: user.email,
@@ -272,31 +247,27 @@ export class UserService {
       mobileNumber: user.mobileNumber,
       role: user.role,
       status: user.status,
-      isPasswordSet: user.isPasswordSet,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      organizationId: user.organizationId.toString(),
+      createdAt: userAny.createdAt,
+      updatedAt: userAny.updatedAt,
     };
   }
 
   async updateUser(
     userId: string,
     updateUserDto: UpdateUserDto,
-    tenantId: string,
-    tenantName: string,
-    tenantDomain: string,
+    organizationId: string,
   ): Promise<any> {
-    const UserModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'User',
-      UserSchema,
-    );
-
     // Find user first to check if they exist and get their role
-    const existingUser = await UserModel.findById(userId);
+    const existingUser = await this.userModel.findById(userId);
 
     if (!existingUser) {
       throw new NotFoundException('User not found');
+    }
+
+    // Check if user belongs to same organization
+    if (existingUser.organizationId.toString() !== organizationId) {
+      throw new ForbiddenException('User does not belong to your organization');
     }
 
     // Prevent updating admin user
@@ -306,24 +277,15 @@ export class UserService {
       );
     }
 
-    // Validate email domain if email is being updated
+    // Check if new email already exists (excluding current user)
     if (updateUserDto.email) {
-      if (!validateEmailDomain(updateUserDto.email, tenantDomain)) {
-        throw new BadRequestException(
-          `User email domain must match organization domain. Expected domain: ${tenantDomain}, but email domain is: ${updateUserDto.email.split('@')[1] || 'invalid'}`,
-        );
-      }
-
-      // Check if new email already exists (excluding current user)
-      const emailExists = await UserModel.findOne({
+      const emailExists = await this.userModel.findOne({
         email: updateUserDto.email,
         _id: { $ne: userId },
       });
 
       if (emailExists) {
-        throw new ConflictException(
-          'User with this email already exists',
-        );
+        throw new ConflictException('User with this email already exists');
       }
     }
 
@@ -332,13 +294,19 @@ export class UserService {
     delete updateData.role; // Remove role if somehow provided
 
     // Update user
-    await UserModel.updateOne({ _id: userId }, updateData);
+    await this.userModel.updateOne({ _id: userId }, updateData);
 
     // Return updated user
-    const updatedUser = await UserModel.findById(userId)
-      .select('-password -passwordSetupToken -passwordSetupTokenExpiry')
+    const updatedUser = await this.userModel
+      .findById(userId)
+      .select('-password')
       .lean();
 
+    if (!updatedUser) {
+      throw new NotFoundException('User not found after update');
+    }
+
+    const userAny = updatedUser as any;
     return {
       id: updatedUser._id.toString(),
       email: updatedUser.email,
@@ -347,29 +315,26 @@ export class UserService {
       mobileNumber: updatedUser.mobileNumber,
       role: updatedUser.role,
       status: updatedUser.status,
-      isPasswordSet: updatedUser.isPasswordSet,
-      createdAt: updatedUser.createdAt,
-      updatedAt: updatedUser.updatedAt,
+      organizationId: updatedUser.organizationId.toString(),
+      createdAt: userAny.createdAt,
+      updatedAt: userAny.updatedAt,
     };
   }
 
   async deleteUser(
     userId: string,
-    tenantId: string,
-    tenantName: string,
+    organizationId: string,
   ): Promise<{ message: string }> {
-    const UserModel = await this.databaseService.getTenantModel(
-      tenantId,
-      tenantName,
-      'User',
-      UserSchema,
-    );
-
     // Find user first to check if they exist and get their role
-    const user = await UserModel.findById(userId);
+    const user = await this.userModel.findById(userId);
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    // Check if user belongs to same organization
+    if (user.organizationId.toString() !== organizationId) {
+      throw new ForbiddenException('User does not belong to your organization');
     }
 
     // Prevent deleting admin user
@@ -380,7 +345,7 @@ export class UserService {
     }
 
     // Delete user
-    await UserModel.deleteOne({ _id: userId });
+    await this.userModel.deleteOne({ _id: userId });
 
     return { message: 'User deleted successfully' };
   }

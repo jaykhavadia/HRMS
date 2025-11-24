@@ -9,36 +9,19 @@ export class Organization {
   companyName: string;
 
   @Prop({ required: true })
-  companyLocation: string;
-
-  @Prop({ required: true, unique: true })
-  companyEmail: string;
+  officeAddress: string;
 
   @Prop({ required: true })
-  displayName: string;
-
-  @Prop({ required: true, unique: true })
-  companyDomain: string;
-
-  @Prop({ required: true, unique: true })
-  clientId: string;
+  latitude: number;
 
   @Prop({ required: true })
-  clientName: string;
+  longitude: number;
+
+  @Prop({ required: true })
+  radius: number; // in meters
 
   @Prop({ default: true })
   isActive: boolean;
-
-  @Prop()
-  subscriptionPlanId?: string;
-
-  @Prop({ type: Object })
-  officeLocation?: {
-    latitude: number;
-    longitude: number;
-    address: string;
-    radius: number; // in meters
-  };
 
   @Prop({ default: Date.now })
   createdAt: Date;

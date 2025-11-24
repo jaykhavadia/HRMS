@@ -1,13 +1,19 @@
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
+import { User, UserSchema } from '../user/schemas/user.schema';
+import { Attendance, AttendanceSchema } from '../attendance/schemas/attendance.schema';
 import { DatabaseModule } from '../../core/database/database.module';
-import { UserModule } from '../user/user.module';
-import { AttendanceModule } from '../attendance/attendance.module';
-import { TenantModule } from '../../core/tenant/tenant.module';
 
 @Module({
-  imports: [DatabaseModule, UserModule, AttendanceModule, TenantModule],
+  imports: [
+    DatabaseModule,
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: Attendance.name, schema: AttendanceSchema },
+    ]),
+  ],
   controllers: [DashboardController],
   providers: [DashboardService],
   exports: [DashboardService],

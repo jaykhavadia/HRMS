@@ -1,14 +1,35 @@
 {
 	"info": {
-		"_postman_id": "hrms-multi-tenant-api",
-		"name": "HRMS Multi-Tenant API",
-		"description": "Complete API collection for HRMS Multi-Tenant Backend",
+		"_postman_id": "hrms-api",
+		"name": "HRMS API",
+		"description": "Complete API collection for HRMS Backend (Single Database)",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
 			"name": "Organization",
 			"item": [
+				{
+					"name": "Check Email",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/organization/check-email?email=admin@example.com",
+							"host": ["{{base_url}}"],
+							"path": ["organization", "check-email"],
+							"query": [
+								{
+									"key": "email",
+									"value": "admin@example.com",
+									"description": "Email address to check"
+								}
+							]
+						},
+						"description": "Step 1: Check if email already exists. Returns { exists: true/false }"
+					},
+					"response": []
+				},
 				{
 					"name": "Register Organization",
 					"event": [
@@ -18,10 +39,7 @@
 								"exec": [
 									"if (pm.response.code === 201) {",
 									"    const response = pm.response.json();",
-									"    pm.environment.set('organization_id', response._id);",
-									"    pm.environment.set('client_id', response.clientId);",
-									"    pm.environment.set('client_name', response.clientName);",
-									"    pm.environment.set('company_domain', response.companyDomain);",
+									"    pm.environment.set('registration_email', response.email);",
 									"}"
 								],
 								"type": "text/javascript"
@@ -38,14 +56,37 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"companyName\": \"Acme Corporation\",\n  \"companyLocation\": \"123 Business St, New York, NY 10001\",\n  \"companyEmail\": \"admin@acme-corp.com\",\n  \"displayName\": \"Acme Corp\",\n  \"companyDomain\": \"acme-corp\",\n  \"adminFirstName\": \"John\",\n  \"adminLastName\": \"Doe\",\n  \"adminEmail\": \"john.doe@acme-corp.com\",\n  \"officeLocation\": {\n    \"latitude\": 40.7128,\n    \"longitude\": -74.0060,\n    \"address\": \"123 Business St, New York, NY 10001\",\n    \"radius\": 100\n  }\n}"
+							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"companyName\": \"Acme Corporation\",\n  \"fullName\": \"John Doe\",\n  \"password\": \"SecurePassword123!\",\n  \"confirmPassword\": \"SecurePassword123!\",\n  \"longitude\": -74.0060,\n  \"latitude\": 40.7128,\n  \"radius\": 100,\n  \"officeAddress\": \"123 Business St, New York, NY 10001\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/organization/register",
 							"host": ["{{base_url}}"],
 							"path": ["organization", "register"]
 						},
-						"description": "Register a new organization. Creates master DB record, tenant database, and admin user.\n\n**Important:**\n- companyEmail domain MUST match companyDomain (e.g., if domain is 'acme-corp', email must be '@acme-corp.com')\n- adminEmail domain MUST match companyDomain (if provided)\n- Only ONE admin user is created during registration\n- This admin is the only admin for the organization"
+						"description": "Step 2: Register organization. Stores data in temp table and sends OTP to email.\n\n**Fields:**\n- email: Admin email (must be unique)\n- companyName: Company name (must be unique)\n- fullName: Admin full name\n- password: Password (min 8 chars, must contain uppercase, lowercase, number)\n- confirmPassword: Must match password\n- longitude: Office longitude\n- latitude: Office latitude\n- radius: Office radius in meters\n- officeAddress: Office address\n\n**Response:** Returns message and email. Check email for OTP."
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/organization/verify-otp",
+							"host": ["{{base_url}}"],
+							"path": ["organization", "verify-otp"]
+						},
+						"description": "Step 3: Verify OTP. Moves data from temp table to actual tables (Organization + Admin User).\n\n**Fields:**\n- email: Email used during registration\n- otp: 6-digit OTP received via email (expires in 15 minutes)\n\n**After verification:** User needs to login separately."
 					},
 					"response": []
 				}
@@ -66,6 +107,7 @@
 									"    pm.environment.set('access_token', response.accessToken);",
 									"    pm.environment.set('user_id', response.user.id);",
 									"    pm.environment.set('user_role', response.user.role);",
+									"    pm.environment.set('organization_id', response.user.organizationId);",
 									"}"
 								],
 								"type": "text/javascript"
@@ -82,14 +124,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"john.doe@acme-corp.com\",\n  \"password\": \"SecurePassword123!\"\n}"
+							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"SecurePassword123!\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/login",
 							"host": ["{{base_url}}"],
 							"path": ["auth", "login"]
 						},
-						"description": "Login with email and password. Tenant is automatically resolved from email domain (e.g., 'acme-corp' from 'john@acme-corp.com'). Returns JWT token with user info including email, which is used for tenant resolution in subsequent requests."
+						"description": "Login with email and password. Returns JWT token with user info including organizationId."
 					},
 					"response": []
 				},
@@ -105,14 +147,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"token\": \"acme-corp:password-setup-token-from-email\",\n  \"password\": \"NewSecurePassword123!\"\n}"
+							"raw": "{\n  \"token\": \"token-from-email\",\n  \"password\": \"NewSecurePassword123!\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/setup-password",
 							"host": ["{{base_url}}"],
 							"path": ["auth", "setup-password"]
 						},
-						"description": "Set password using token received via email. Token format: 'tenantDomain:token' (e.g., 'acme-corp:token'). Tenant is automatically resolved from the token itself - no email needed in request body."
+						"description": "Set password for employees created by admin. Token is received via email when admin creates a new user.\n\n**Fields:**\n- token: Token from password setup email (required) - uniquely identifies the user\n- password: New password (min 8 chars, must contain uppercase, lowercase, number)\n\n**Note:** Token expires in 24 hours. After setting password, user can login normally. Email is not needed as the token uniquely identifies the user."
 					},
 					"response": []
 				}
@@ -137,7 +179,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"email\": \"jane.smith@acme-corp.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"role\": \"employee\",\n  \"status\": \"active\"\n}",
+							"raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"role\": \"employee\",\n  \"status\": \"active\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -149,7 +191,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user"]
 						},
-						"description": "Create a new user. Admin only. Tenant is resolved from authenticated user's email (from JWT token). Password setup email will be sent.\n\n**Important:**\n- User email domain MUST match organization domain (e.g., if org domain is 'acme-corp', email must be '@acme-corp.com')\n- Role can only be 'employee' (admin role is not allowed - only one admin per organization, created during registration)\n- If role is not provided or set to 'admin', it will be forced to 'employee'"
+						"description": "Create a new user. Admin only. Password setup email will be sent.\n\n**Important:**\n- Email must be unique across all organizations\n- Role can only be 'employee' (admin role is not allowed - only one admin per organization)\n- If role is not provided, defaults to 'employee'"
 					},
 					"response": []
 				},
@@ -170,7 +212,7 @@
 									"key": "file",
 									"type": "file",
 									"src": [],
-									"description": "Excel file with columns: First Name, Last Name, Email, Mobile Number, Role (must be 'employee'), Status. All emails must match organization domain."
+									"description": "Excel file with columns: First Name, Last Name, Email, Mobile Number, Role (must be 'employee'), Status. All emails must be unique."
 								}
 							]
 						},
@@ -179,7 +221,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user", "bulk-upload"]
 						},
-						"description": "Bulk upload users from Excel file. Admin only. Tenant is resolved from authenticated user's email (from JWT token).\n\n**Excel Format:**\n- Columns: First Name, Last Name, Email, Mobile Number, Role, Status\n- All user emails MUST match organization domain (e.g., if org domain is 'acme-corp', emails must be '@acme-corp.com')\n- Role can only be 'employee' (admin role will be rejected - only one admin per organization, created during registration)\n- Invalid rows will be skipped with error messages showing row numbers"
+						"description": "Bulk upload users from Excel file. Admin only.\n\n**Excel Format:**\n- Columns: First Name, Last Name, Email, Mobile Number, Role, Status\n- All emails must be unique across all organizations\n- Role can only be 'employee' (admin role will be rejected)\n- Invalid rows will be skipped with error messages showing row numbers"
 					},
 					"response": []
 				},
@@ -198,7 +240,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user"]
 						},
-						"description": "Get all users. Tenant is resolved from authenticated user's email (from JWT token). Admin sees all users, employee sees only their own profile. No query parameters needed - role is determined from authenticated user's token."
+						"description": "Get all users. Admin sees all users in their organization, employee sees only their own profile."
 					},
 					"response": []
 				},
@@ -224,7 +266,7 @@
 								}
 							]
 						},
-						"description": "Get user by ID. Tenant is resolved from authenticated user's email (from JWT token). Employees can only view their own profile."
+						"description": "Get user by ID. Employees can only view their own profile."
 					},
 					"response": []
 				},
@@ -244,7 +286,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"firstName\": \"Jane Updated\",\n  \"lastName\": \"Smith Updated\",\n  \"email\": \"jane.updated@acme-corp.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"status\": \"active\"\n}",
+							"raw": "{\n  \"firstName\": \"Jane Updated\",\n  \"lastName\": \"Smith Updated\",\n  \"email\": \"jane.updated@example.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"status\": \"active\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -263,7 +305,7 @@
 								}
 							]
 						},
-						"description": "Update user information. Admin only. Tenant is resolved from authenticated user's email (from JWT token).\n\n**Important:**\n- Admin user CANNOT be updated (protected - only one admin per organization)\n- User email domain MUST match organization domain if email is being updated\n- Role cannot be updated (immutable)\n- All fields are optional - only provided fields will be updated"
+						"description": "Update user information. Admin only.\n\n**Important:**\n- Admin user CANNOT be updated (protected)\n- Email must be unique if being updated\n- Role cannot be updated (immutable)\n- All fields are optional - only provided fields will be updated"
 					},
 					"response": []
 				},
@@ -289,7 +331,7 @@
 								}
 							]
 						},
-						"description": "Delete a user. Admin only. Tenant is resolved from authenticated user's email (from JWT token).\n\n**Important:**\n- Admin user CANNOT be deleted (protected - only one admin per organization)\n- Only employee users can be deleted"
+						"description": "Delete a user. Admin only.\n\n**Important:**\n- Admin user CANNOT be deleted (protected)\n- Only employee users can be deleted"
 					},
 					"response": []
 				}
@@ -342,7 +384,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["attendance", "check-in"]
 						},
-						"description": "Check in with selfie and location. Uses form-data (multipart/form-data). Tenant is resolved from authenticated user's email (from JWT token). Location must be within office radius (default 100m).\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (required) - Selfie image (JPEG/PNG, max 5MB)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
+						"description": "Check in with selfie and location. Uses form-data (multipart/form-data). Location must be within office radius.\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (required) - Selfie image (JPEG/PNG, max 5MB)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
 					},
 					"response": []
 				},
@@ -386,7 +428,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["attendance", "check-out"]
 						},
-						"description": "Check out with selfie and location. Uses form-data (multipart/form-data). Tenant is resolved from authenticated user's email (from JWT token). Location must be within office radius (default 100m). Must have checked in first.\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (required) - Selfie image (JPEG/PNG, max 5MB)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
+						"description": "Check out with selfie and location. Uses form-data (multipart/form-data). Location must be within office radius. Must have checked in first.\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (required) - Selfie image (JPEG/PNG, max 5MB)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
 					},
 					"response": []
 				},
@@ -422,7 +464,7 @@
 								}
 							]
 						},
-						"description": "Get attendance records. Tenant is resolved from authenticated user's email (from JWT token). Admin can filter by userId, employees see only own records."
+						"description": "Get attendance records. Admin can filter by userId, employees see only own records."
 					},
 					"response": []
 				}
@@ -446,7 +488,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["dashboard", "stats"]
 						},
-						"description": "Get dashboard statistics. Tenant is resolved from authenticated user's email (from JWT token). Admin only. Returns user stats, attendance stats, and recent records."
+						"description": "Get dashboard statistics. Admin only. Returns user stats, attendance stats, and recent records."
 					},
 					"response": []
 				}
@@ -481,4 +523,3 @@
 		}
 	]
 }
-

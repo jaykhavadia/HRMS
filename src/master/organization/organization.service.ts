@@ -3,182 +3,206 @@ import {
   ConflictException,
   InternalServerErrorException,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { v4 as uuidv4 } from 'uuid';
+import * as bcrypt from 'bcrypt';
 import { Organization } from './schemas/organization.schema';
-import { RegisterOrganizationDto } from './dto/register-organization.dto';
-import { DatabaseService } from '../../core/database/database.service';
+import { TempRegistration } from './schemas/temp-registration.schema';
+import { User } from '../../tenant/user/schemas/user.schema';
+import { CheckEmailDto } from './dto/check-email.dto';
+import { RegisterDto } from './dto/register.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { EmailService } from '../../shared/email/email.service';
-import { ConfigService } from '../../config/config.service';
-import { Schema } from 'mongoose';
-import { encodeTokenWithTenant } from '../../common/utils/token.util';
-import {
-  validateEmailDomain,
-  extractTenantDomainFromEmail,
-} from '../../common/utils/email.util';
 
 @Injectable()
 export class OrganizationService {
   constructor(
     @InjectModel(Organization.name)
     private organizationModel: Model<Organization>,
-    private databaseService: DatabaseService,
+    @InjectModel(TempRegistration.name)
+    private tempRegistrationModel: Model<TempRegistration>,
+    @InjectModel(User.name)
+    private userModel: Model<User>,
     private emailService: EmailService,
-    private configService: ConfigService,
   ) {}
 
-  async registerOrganization(
-    dto: RegisterOrganizationDto,
-  ): Promise<Organization> {
-    // Validate companyEmail domain matches companyDomain
-    if (!validateEmailDomain(dto.companyEmail, dto.companyDomain)) {
-      throw new BadRequestException(
-        `Company email domain must match company domain. Expected domain: ${dto.companyDomain}, but got: ${extractTenantDomainFromEmail(dto.companyEmail)}`,
-      );
+  /**
+   * Step 1: Check if email exists
+   */
+  async checkEmail(dto: CheckEmailDto): Promise<{ exists: boolean }> {
+    // Check in User table
+    const existingUser = await this.userModel.findOne({ email: dto.email });
+    if (existingUser) {
+      return { exists: true };
     }
 
-    // Validate adminEmail domain matches companyDomain (if provided)
-    if (dto.adminEmail && !validateEmailDomain(dto.adminEmail, dto.companyDomain)) {
-      throw new BadRequestException(
-        `Admin email domain must match company domain. Expected domain: ${dto.companyDomain}, but got: ${extractTenantDomainFromEmail(dto.adminEmail)}`,
-      );
+    // Check in TempRegistration table
+    const tempRegistration = await this.tempRegistrationModel.findOne({
+      email: dto.email,
+      isVerified: false,
+    });
+    if (tempRegistration) {
+      return { exists: true };
     }
 
-    // Check if domain or email already exists
+    return { exists: false };
+  }
+
+  /**
+   * Step 2: Register organization (store in temp table and send OTP)
+   */
+  async register(dto: RegisterDto): Promise<{ message: string; email: string }> {
+    // Validate password match
+    if (dto.password !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    // Check if email already exists
+    const emailCheck = await this.checkEmail({ email: dto.email });
+    if (emailCheck.exists) {
+      throw new ConflictException('Email already exists');
+    }
+
+    // Check if company name already exists
     const existingOrg = await this.organizationModel.findOne({
-      $or: [
-        { companyDomain: dto.companyDomain },
-        { companyEmail: dto.companyEmail },
-      ],
+      companyName: dto.companyName,
+    });
+    if (existingOrg) {
+      throw new ConflictException('Company name already exists');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Set OTP expiry (15 minutes)
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 15);
+
+    // Delete any existing temp registration for this email
+    await this.tempRegistrationModel.deleteOne({ email: dto.email });
+
+    // Create temp registration
+    const tempRegistration = new this.tempRegistrationModel({
+      email: dto.email,
+      companyName: dto.companyName,
+      fullName: dto.fullName,
+      password: hashedPassword,
+      longitude: dto.longitude,
+      latitude: dto.latitude,
+      radius: dto.radius,
+      officeAddress: dto.officeAddress,
+      otp,
+      otpExpiry,
+      isVerified: false,
     });
 
-    if (existingOrg) {
-      throw new ConflictException(
-        'Organization with this domain or email already exists',
+    await tempRegistration.save();
+
+    // Send OTP email
+    await this.emailService.sendOtpEmail(dto.email, otp, dto.companyName);
+
+    return {
+      message: 'Registration successful. Please check your email for OTP verification.',
+      email: dto.email,
+    };
+  }
+
+  /**
+   * Step 3: Verify OTP and create organization + admin user
+   */
+  async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string }> {
+    // Find temp registration
+    const tempRegistration = await this.tempRegistrationModel.findOne({
+      email: dto.email,
+      isVerified: false,
+    });
+
+    if (!tempRegistration) {
+      throw new NotFoundException(
+        'Registration not found or already verified',
       );
     }
 
-    // Generate unique clientId
-    const clientId = uuidv4().substring(0, 8);
-    const clientName = dto.companyName.replace(/[^a-zA-Z0-9]/g, '_');
+    // Check OTP expiry
+    if (new Date() > tempRegistration.otpExpiry) {
+      // Delete expired temp registration
+      await this.tempRegistrationModel.deleteOne({ _id: tempRegistration._id });
+      throw new BadRequestException('OTP has expired. Please register again.');
+    }
 
-    // Create organization in master DB
-    const organization = new this.organizationModel({
-      ...dto,
-      clientId,
-      clientName,
-      isActive: true,
-      officeLocation: dto.officeLocation || {
-        latitude: 0,
-        longitude: 0,
-        address: dto.companyLocation,
-        radius: this.configService.getOfficeLocationRadius(),
-      },
-    });
+    // Verify OTP
+    if (tempRegistration.otp !== dto.otp) {
+      throw new BadRequestException('Invalid OTP');
+    }
+
+    // Split fullName into firstName and lastName
+    const nameParts = tempRegistration.fullName.trim().split(/\s+/);
+    const firstName = nameParts[0] || 'Admin';
+    const lastName = nameParts.slice(1).join(' ') || 'User';
 
     try {
-      await organization.save();
+      // Create organization
+      const organization = new this.organizationModel({
+        companyName: tempRegistration.companyName,
+        officeAddress: tempRegistration.officeAddress,
+        latitude: tempRegistration.latitude,
+        longitude: tempRegistration.longitude,
+        radius: tempRegistration.radius,
+        isActive: true,
+      });
 
-      // Create tenant database
-      await this.databaseService.createTenantDatabase(clientId, clientName);
+      const savedOrganization = await organization.save();
 
-      // Create admin user in tenant database
-      if (dto.adminEmail) {
-        await this.createAdminUser(
-          clientId,
-          clientName,
-          dto.companyDomain,
-          dto.adminEmail,
-          dto.adminFirstName || 'Admin',
-          dto.adminLastName || 'User',
-        );
-      }
+      // Create admin user
+      const adminUser = new this.userModel({
+        email: tempRegistration.email,
+        password: tempRegistration.password, // Already hashed
+        firstName,
+        lastName,
+        role: 'admin',
+        status: 'active',
+        organizationId: savedOrganization._id.toString(),
+      });
+
+      await adminUser.save();
+
+      // Mark temp registration as verified
+      tempRegistration.isVerified = true;
+      tempRegistration.verifiedAt = new Date();
+      await tempRegistration.save();
 
       // Send welcome email
       await this.emailService.sendWelcomeEmail(
-        dto.companyEmail,
-        dto.companyName,
-        dto.displayName,
+        tempRegistration.email,
+        tempRegistration.companyName,
+        tempRegistration.companyName,
       );
 
-      return organization;
+      return {
+        message: 'Registration verified successfully. Please login to continue.',
+      };
     } catch (error) {
-      // Rollback: delete organization if tenant creation fails
-      await this.organizationModel.deleteOne({ _id: organization._id });
+      // Rollback: delete organization if user creation fails
+      if (error.code === 11000) {
+        // Duplicate key error
+        throw new ConflictException('Email or company name already exists');
+      }
       throw new InternalServerErrorException(
-        'Failed to create organization: ' + error.message,
+        'Failed to complete registration: ' + error.message,
       );
     }
-  }
-
-  private async createAdminUser(
-    clientId: string,
-    clientName: string,
-    companyDomain: string,
-    email: string,
-    firstName: string,
-    lastName: string,
-  ): Promise<void> {
-    const UserSchema = new Schema(
-      {
-        email: { type: String, required: true, unique: true },
-        password: { type: String },
-        firstName: { type: String, required: true },
-        lastName: { type: String, required: true },
-        role: { type: String, enum: ['admin', 'employee'], default: 'admin' },
-        status: {
-          type: String,
-          enum: ['active', 'inactive'],
-          default: 'active',
-        },
-        mobileNumber: { type: String },
-        isPasswordSet: { type: Boolean, default: false },
-        passwordSetupToken: { type: String },
-        passwordSetupTokenExpiry: { type: Date },
-      },
-      { timestamps: true },
-    );
-
-    const UserModel = await this.databaseService.getTenantModel(
-      clientId,
-      clientName,
-      'User',
-      UserSchema,
-    );
-
-    // Generate password setup token
-    const rawToken = uuidv4();
-    const passwordSetupToken = encodeTokenWithTenant(companyDomain, rawToken);
-    const passwordSetupTokenExpiry = new Date();
-    passwordSetupTokenExpiry.setHours(passwordSetupTokenExpiry.getHours() + 24);
-
-    const adminUser = new UserModel({
-      email,
-      firstName,
-      lastName,
-      role: 'admin',
-      status: 'active',
-      isPasswordSet: false,
-      passwordSetupToken: rawToken, // Store raw token in DB
-      passwordSetupTokenExpiry,
-    });
-
-    await adminUser.save();
-
-    // Send password setup email with encoded token
-    const frontendUrl = this.configService.getFrontendUrl();
-    const setupUrl = `${frontendUrl}#/setup-password?token=${passwordSetupToken}`;
-
-    await this.emailService.sendPasswordSetupEmail(email, firstName, setupUrl);
   }
 
   async findById(id: string): Promise<Organization | null> {
     return this.organizationModel.findById(id);
   }
 
-  async findByClientId(clientId: string): Promise<Organization | null> {
-    return this.organizationModel.findOne({ clientId, isActive: true });
+  async findByCompanyName(companyName: string): Promise<Organization | null> {
+    return this.organizationModel.findOne({ companyName, isActive: true });
   }
 }
