@@ -56,14 +56,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"companyName\": \"Acme Corporation\",\n  \"fullName\": \"John Doe\",\n  \"password\": \"SecurePassword123!\",\n  \"confirmPassword\": \"SecurePassword123!\",\n  \"longitude\": -74.0060,\n  \"latitude\": 40.7128,\n  \"radius\": 100,\n  \"officeAddress\": \"123 Business St, New York, NY 10001\"\n}"
+							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"companyName\": \"Acme Corporation\",\n  \"fullName\": \"John Doe\",\n  \"password\": \"SecurePassword123!\",\n  \"confirmPassword\": \"SecurePassword123!\",\n  \"longitude\": -74.0060,\n  \"latitude\": 40.7128,\n  \"radius\": 100,\n  \"officeAddress\": \"123 Business St, New York, NY 10001\",\n  \"agreementAccepted\": true,\n  \"agreementVersion\": \"1.0\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/organization/register",
 							"host": ["{{base_url}}"],
 							"path": ["organization", "register"]
 						},
-						"description": "Step 2: Register organization. Stores data in temp table and sends OTP to email.\n\n**Fields:**\n- email: Admin email (must be unique)\n- companyName: Company name (must be unique)\n- fullName: Admin full name\n- password: Password (min 8 chars, must contain uppercase, lowercase, number)\n- confirmPassword: Must match password\n- longitude: Office longitude\n- latitude: Office latitude\n- radius: Office radius in meters\n- officeAddress: Office address\n\n**Response:** Returns message and email. Check email for OTP."
+						"description": "Step 2: Register organization. Stores data in temp table and sends OTP to email.\n\n**Fields:**\n- email: Admin email (must be unique)\n- companyName: Company name (must be unique)\n- fullName: Admin full name\n- password: Password (min 8 chars, must contain uppercase, lowercase, number)\n- confirmPassword: Must match password\n- longitude: Office longitude\n- latitude: Office latitude\n- radius: Office radius in meters\n- officeAddress: Office address\n- agreementAccepted: Boolean (required) - Registration agreement acceptance\n- agreementVersion: String (optional) - Version of agreement accepted\n\n**Response:** Returns message and email. Check email for OTP."
 					},
 					"response": []
 				},
@@ -87,6 +87,52 @@
 							"path": ["organization", "verify-otp"]
 						},
 						"description": "Step 3: Verify OTP. Moves data from temp table to actual tables (Organization + Admin User).\n\n**Fields:**\n- email: Email used during registration\n- otp: 6-digit OTP received via email (expires in 15 minutes)\n\n**After verification:** User needs to login separately."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Company Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/organization/profile",
+							"host": ["{{base_url}}"],
+							"path": ["organization", "profile"]
+						},
+						"description": "Get company profile details. Admin only.\n\n**Returns:**\n- Company name, address, location (lat/lng/radius)\n- Work hours (start/end time)\n- Weekly off days (0=Sunday, 1=Monday, ..., 6=Saturday)\n- Agreement acceptance record\n- Active status"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Company Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"workStartTime\": \"09:00\",\n  \"workEndTime\": \"18:00\",\n  \"weeklyOffDays\": [0, 6],\n  \"officeAddress\": \"123 Business St, New York, NY 10001\",\n  \"latitude\": 40.7128,\n  \"longitude\": -74.0060,\n  \"radius\": 100\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/organization/profile",
+							"host": ["{{base_url}}"],
+							"path": ["organization", "profile"]
+						},
+						"description": "Update company profile. Admin only.\n\n**Fields (all optional):**\n- workStartTime: String (HH:mm format, 24-hour) - Default: 09:00\n- workEndTime: String (HH:mm format, 24-hour) - Default: 18:00\n- weeklyOffDays: Array of numbers (0-6) - 0=Sunday, 1=Monday, ..., 6=Saturday\n- officeAddress: String\n- latitude: Number\n- longitude: Number\n- radius: Number (in meters)\n\n**Note:** Only provided fields will be updated."
 					},
 					"response": []
 				}
@@ -191,7 +237,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user"]
 						},
-						"description": "Create a new user. Admin only. Password setup email will be sent.\n\n**Important:**\n- Email must be unique across all organizations\n- Role can only be 'employee' (admin role is not allowed - only one admin per organization)\n- If role is not provided, defaults to 'employee'"
+						"description": "Create a new user. Admin only. Password setup email will be sent.\n\n**Important:**\n- Email must be unique across all organizations\n- Role can only be 'employee' (admin role is not allowed - only one admin per organization)\n- If role is not provided, defaults to 'employee'\n- Employee ID is auto-generated (EMP001, EMP002, etc.)\n- Admin user created during registration gets EMP001"
 					},
 					"response": []
 				},
@@ -331,7 +377,7 @@
 								}
 							]
 						},
-						"description": "Delete a user. Admin only.\n\n**Important:**\n- Admin user CANNOT be deleted (protected)\n- Only employee users can be deleted"
+						"description": "Delete a user. Admin only.\n\n**Important:**\n- Admin user CANNOT be deleted (protected)\n- Active employees CANNOT be deleted - must deactivate first\n- Only inactive employee users can be deleted"
 					},
 					"response": []
 				}
@@ -467,6 +513,73 @@
 						"description": "Get attendance records. Admin can filter by userId, employees see only own records."
 					},
 					"response": []
+				},
+				{
+					"name": "Export Attendance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/attendance/export?userId=&startDate=&endDate=",
+							"host": ["{{base_url}}"],
+							"path": ["attendance", "export"],
+							"query": [
+								{
+									"key": "userId",
+									"value": "",
+									"description": "Filter by user ID (admin only). Optional."
+								},
+								{
+									"key": "startDate",
+									"value": "",
+									"description": "Start date (YYYY-MM-DD). Optional."
+								},
+								{
+									"key": "endDate",
+									"value": "",
+									"description": "End date (YYYY-MM-DD). Optional."
+								}
+							]
+						},
+						"description": "Export attendance records as CSV. Admin can filter by userId, employees see only own records.\n\n**Returns:**\n- CSV content with headers: Date, Employee Name, Email, Check-In Time, Check-Out Time, Total Hours, Status, Check-In Location, Check-Out Location\n- Filename for download\n\n**Note:** Use the CSV content to create a downloadable file."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Map Locations",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/attendance/map-locations?startDate=&endDate=",
+							"host": ["{{base_url}}"],
+							"path": ["attendance", "map-locations"],
+							"query": [
+								{
+									"key": "startDate",
+									"value": "",
+									"description": "Start date (YYYY-MM-DD). Optional."
+								},
+								{
+									"key": "endDate",
+									"value": "",
+									"description": "End date (YYYY-MM-DD). Optional."
+								}
+							]
+						},
+						"description": "Get check-in locations for map visualization. Returns all check-in locations with coordinates and user info.\n\n**Returns:**\n- Array of check-in locations with:\n  - userId (with firstName, lastName, email, employeeId)\n  - checkInTime\n  - location (latitude, longitude, address)\n  - status\n\n**Use Case:** Display check-in pin points on a map in the dashboard."
+					},
+					"response": []
 				}
 			]
 		},
@@ -488,7 +601,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["dashboard", "stats"]
 						},
-						"description": "Get dashboard statistics. Admin only. Returns user stats, attendance stats, and recent records."
+						"description": "Get dashboard statistics. Admin only.\n\n**Returns:**\n- **users:** Total, admins, employees count\n- **attendance:** Today (checkedIn, checkedOut, pending), week, month, averageHours\n- **recentAttendance:** Last 10 attendance records\n- **recentEmployeeActions:** Last 20 employee actions (check-ins/check-outs) with action type and time\n- **mapLocations:** Today's check-in locations for map visualization (latitude, longitude, address, user info)\n\n**Use Cases:**\n- Display statistics cards\n- Show recent attendance table\n- Show recent employee actions table\n- Display map with check-in pin points"
 					},
 					"response": []
 				}

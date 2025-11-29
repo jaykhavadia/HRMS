@@ -26,6 +26,29 @@ export class UserService {
     private fileUploadService: FileUploadService,
   ) {}
 
+  /**
+   * Generate unique employee ID for an organization
+   * Format: EMP001, EMP002, etc.
+   */
+  private async generateEmployeeId(organizationId: string): Promise<string> {
+    // Get the highest employee ID for this organization
+    const lastUser = await this.userModel
+      .findOne({ organizationId, employeeId: { $exists: true, $ne: null } })
+      .sort({ employeeId: -1 })
+      .lean();
+
+    let nextNumber = 1;
+    if (lastUser && (lastUser as any).employeeId) {
+      const lastId = (lastUser as any).employeeId;
+      const match = lastId.match(/EMP(\d+)/);
+      if (match) {
+        nextNumber = parseInt(match[1], 10) + 1;
+      }
+    }
+
+    return `EMP${String(nextNumber).padStart(3, '0')}`;
+  }
+
   async createUser(
     createUserDto: CreateUserDto,
     organizationId: string,
@@ -51,12 +74,16 @@ export class UserService {
     const passwordSetupTokenExpiry = new Date();
     passwordSetupTokenExpiry.setHours(passwordSetupTokenExpiry.getHours() + 24);
 
+    // Generate employee ID
+    const employeeId = await this.generateEmployeeId(organizationId);
+
     // Force role to 'employee' - admin role is not allowed for new users
     const user = new this.userModel({
       ...createUserDto,
       role: 'employee', // Always set to employee - admin cannot be created
       status: createUserDto.status || 'active',
       organizationId,
+      employeeId, // Auto-generated employee ID
       // password is optional - will be set via password setup
       passwordSetupToken: rawToken,
       passwordSetupTokenExpiry,
@@ -74,14 +101,15 @@ export class UserService {
       setupUrl,
     );
 
-    return {
-      id: user._id.toString(),
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      status: user.status,
-    };
+        return {
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          status: user.status,
+          employeeId: user.employeeId,
+        };
   }
 
   async bulkUploadUsers(
@@ -149,11 +177,15 @@ export class UserService {
           passwordSetupTokenExpiry.getHours() + 24,
         );
 
+        // Generate employee ID
+        const employeeId = await this.generateEmployeeId(organizationId);
+
         // Force role to 'employee' - admin role is not allowed
         const user = new this.userModel({
           ...userData,
           role: 'employee', // Always set to employee - admin cannot be created
           organizationId,
+          employeeId, // Auto-generated employee ID
           // password is optional - will be set via password setup
           passwordSetupToken: rawToken,
           passwordSetupTokenExpiry,
@@ -207,6 +239,7 @@ export class UserService {
       mobileNumber: user.mobileNumber,
       role: user.role,
       status: user.status,
+      employeeId: user.employeeId,
       organizationId: user.organizationId.toString(),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
@@ -247,6 +280,7 @@ export class UserService {
       mobileNumber: user.mobileNumber,
       role: user.role,
       status: user.status,
+      employeeId: user.employeeId,
       organizationId: user.organizationId.toString(),
       createdAt: userAny.createdAt,
       updatedAt: userAny.updatedAt,
@@ -315,6 +349,7 @@ export class UserService {
       mobileNumber: updatedUser.mobileNumber,
       role: updatedUser.role,
       status: updatedUser.status,
+      employeeId: updatedUser.employeeId,
       organizationId: updatedUser.organizationId.toString(),
       createdAt: userAny.createdAt,
       updatedAt: userAny.updatedAt,
@@ -341,6 +376,13 @@ export class UserService {
     if (user.role === 'admin') {
       throw new ForbiddenException(
         'Admin user cannot be deleted. Admin user is protected.',
+      );
+    }
+
+    // Prevent deleting active employees
+    if (user.status === 'active') {
+      throw new BadRequestException(
+        'Active employees cannot be deleted. Please deactivate the employee first.',
       );
     }
 

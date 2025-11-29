@@ -84,9 +84,31 @@ export class DashboardService {
     // Get recent attendance (last 10 records)
     const recentAttendance = await this.attendanceModel
       .find({ organizationId })
-      .populate('userId', 'firstName lastName email')
+      .populate('userId', 'firstName lastName email employeeId')
       .sort({ checkInTime: -1 })
       .limit(10)
+      .lean();
+
+    // Get recent employee actions (check-ins and check-outs) - last 20 actions
+    const recentActions = await this.attendanceModel
+      .find({
+        organizationId,
+        $or: [{ checkInTime: { $exists: true } }, { checkOutTime: { $exists: true } }],
+      })
+      .populate('userId', 'firstName lastName email employeeId')
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .lean();
+
+    // Get check-in locations for map visualization (today's check-ins)
+    const todayCheckIns = await this.attendanceModel
+      .find({
+        organizationId,
+        date: { $gte: today, $lt: tomorrow },
+        checkInLocation: { $exists: true, $ne: null },
+      })
+      .populate('userId', 'firstName lastName email employeeId')
+      .sort({ checkInTime: -1 })
       .lean();
 
     return {
@@ -105,7 +127,7 @@ export class DashboardService {
         month: monthAttendance,
         averageHours: Math.round(avgHours * 100) / 100,
       },
-      recentAttendance: recentAttendance.map((record) => ({
+      recentAttendance: recentAttendance.map((record: any) => ({
         id: record._id.toString(),
         userId: record.userId,
         date: record.date,
@@ -113,6 +135,28 @@ export class DashboardService {
         checkOutTime: record.checkOutTime,
         status: record.status,
         totalHours: record.totalHours,
+      })),
+      recentEmployeeActions: recentActions.map((record: any) => ({
+        id: record._id.toString(),
+        userId: record.userId,
+        date: record.date,
+        checkInTime: record.checkInTime,
+        checkOutTime: record.checkOutTime,
+        action: record.checkOutTime ? 'check-out' : 'check-in',
+        actionTime: record.checkOutTime || record.checkInTime,
+        status: record.status,
+        totalHours: record.totalHours,
+        updatedAt: record.updatedAt,
+      })),
+      mapLocations: todayCheckIns.map((record: any) => ({
+        id: record._id.toString(),
+        userId: record.userId,
+        checkInTime: record.checkInTime,
+        location: {
+          latitude: record.checkInLocation?.latitude,
+          longitude: record.checkInLocation?.longitude,
+          address: record.checkInLocation?.address,
+        },
       })),
     };
   }

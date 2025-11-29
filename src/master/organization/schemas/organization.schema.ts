@@ -23,6 +23,27 @@ export class Organization {
   @Prop({ default: true })
   isActive: boolean;
 
+  // Work hours
+  @Prop({ default: '09:00' })
+  workStartTime: string; // Format: HH:mm (24-hour)
+
+  @Prop({ default: '18:00' })
+  workEndTime: string; // Format: HH:mm (24-hour)
+
+  // Weekly off days (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  @Prop({ type: [Number], default: [] })
+  weeklyOffDays: number[];
+
+  // Registration agreement acceptance record
+  @Prop({ default: false })
+  agreementAccepted: boolean;
+
+  @Prop()
+  agreementAcceptedAt?: Date;
+
+  @Prop()
+  agreementVersion?: string; // Version of agreement accepted
+
   @Prop({ default: Date.now })
   createdAt: Date;
 

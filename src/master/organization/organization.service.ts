@@ -99,6 +99,8 @@ export class OrganizationService {
       otp,
       otpExpiry,
       isVerified: false,
+      agreementAccepted: dto.agreementAccepted || false,
+      agreementVersion: dto.agreementVersion,
     });
 
     await tempRegistration.save();
@@ -158,7 +160,7 @@ export class OrganizationService {
 
       const savedOrganization = await organization.save();
 
-      // Create admin user
+      // Create admin user (first user gets EMP001)
       const adminUser = new this.userModel({
         email: tempRegistration.email,
         password: tempRegistration.password, // Already hashed
@@ -167,6 +169,7 @@ export class OrganizationService {
         role: 'admin',
         status: 'active',
         organizationId: savedOrganization._id.toString(),
+        employeeId: 'EMP001', // Admin is always the first employee
       });
 
       await adminUser.save();
@@ -204,5 +207,85 @@ export class OrganizationService {
 
   async findByCompanyName(companyName: string): Promise<Organization | null> {
     return this.organizationModel.findOne({ companyName, isActive: true });
+  }
+
+  /**
+   * Get company profile by organization ID
+   */
+  async getCompanyProfile(organizationId: string): Promise<any> {
+    const organization = await this.organizationModel
+      .findById(organizationId)
+      .lean();
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    return {
+      id: organization._id.toString(),
+      companyName: organization.companyName,
+      officeAddress: organization.officeAddress,
+      latitude: organization.latitude,
+      longitude: organization.longitude,
+      radius: organization.radius,
+      workStartTime: organization.workStartTime || '09:00',
+      workEndTime: organization.workEndTime || '18:00',
+      weeklyOffDays: organization.weeklyOffDays || [],
+      agreementAccepted: organization.agreementAccepted || false,
+      agreementAcceptedAt: organization.agreementAcceptedAt,
+      agreementVersion: organization.agreementVersion,
+      isActive: organization.isActive,
+      createdAt: organization.createdAt,
+      updatedAt: organization.updatedAt,
+    };
+  }
+
+  /**
+   * Update company profile (work hours, weekly off days, etc.)
+   */
+  async updateCompanyProfile(
+    organizationId: string,
+    updateData: {
+      workStartTime?: string;
+      workEndTime?: string;
+      weeklyOffDays?: number[];
+      officeAddress?: string;
+      latitude?: number;
+      longitude?: number;
+      radius?: number;
+    },
+  ): Promise<any> {
+    const organization = await this.organizationModel.findById(organizationId);
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    // Update fields
+    if (updateData.workStartTime !== undefined) {
+      organization.workStartTime = updateData.workStartTime;
+    }
+    if (updateData.workEndTime !== undefined) {
+      organization.workEndTime = updateData.workEndTime;
+    }
+    if (updateData.weeklyOffDays !== undefined) {
+      organization.weeklyOffDays = updateData.weeklyOffDays;
+    }
+    if (updateData.officeAddress !== undefined) {
+      organization.officeAddress = updateData.officeAddress;
+    }
+    if (updateData.latitude !== undefined) {
+      organization.latitude = updateData.latitude;
+    }
+    if (updateData.longitude !== undefined) {
+      organization.longitude = updateData.longitude;
+    }
+    if (updateData.radius !== undefined) {
+      organization.radius = updateData.radius;
+    }
+
+    await organization.save();
+
+    return this.getCompanyProfile(organizationId);
   }
 }

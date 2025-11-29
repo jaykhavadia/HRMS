@@ -38,6 +38,9 @@ export class User {
   @Prop({ type: 'ObjectId', ref: 'Organization', required: true })
   organizationId: string;
 
+  @Prop({ unique: true, sparse: true })
+  employeeId?: string; // Auto-generated employee ID (e.g., EMP001, EMP002)
+
   @Prop()
   passwordSetupToken?: string;
 

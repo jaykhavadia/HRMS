@@ -272,4 +272,113 @@ export class AttendanceService {
       updatedAt: record.updatedAt,
     }));
   }
+
+  /**
+   * Export attendance records to CSV format
+   */
+  async exportAttendanceRecords(
+    userId: string | null,
+    organizationId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<string> {
+    const records = await this.getAttendanceRecords(
+      userId,
+      organizationId,
+      startDate,
+      endDate,
+    );
+
+    // CSV header
+    const headers = [
+      'Date',
+      'Employee Name',
+      'Email',
+      'Check-In Time',
+      'Check-Out Time',
+      'Total Hours',
+      'Status',
+      'Check-In Location',
+      'Check-Out Location',
+    ];
+
+    // CSV rows
+    const rows = records.map((record: any) => {
+      const user = record.userId;
+      const userName = user
+        ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+        : 'N/A';
+      const userEmail = user?.email || 'N/A';
+
+      return [
+        record.date ? new Date(record.date).toLocaleDateString() : 'N/A',
+        userName,
+        userEmail,
+        record.checkInTime
+          ? new Date(record.checkInTime).toLocaleString()
+          : 'N/A',
+        record.checkOutTime
+          ? new Date(record.checkOutTime).toLocaleString()
+          : 'N/A',
+        record.totalHours ? record.totalHours.toFixed(2) : 'N/A',
+        record.status || 'N/A',
+        record.checkInLocation
+          ? `${record.checkInLocation.latitude}, ${record.checkInLocation.longitude}`
+          : 'N/A',
+        record.checkOutLocation
+          ? `${record.checkOutLocation.latitude}, ${record.checkOutLocation.longitude}`
+          : 'N/A',
+      ];
+    });
+
+    // Combine headers and rows
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell}"`).join(','))
+      .join('\n');
+
+    return csvContent;
+  }
+
+  /**
+   * Get check-in locations for map visualization
+   */
+  async getCheckInLocationsForMap(
+    organizationId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<any[]> {
+    const query: any = {
+      organizationId,
+      checkInLocation: { $exists: true, $ne: null },
+    };
+
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) {
+        query.date.$gte = startDate;
+      }
+      if (endDate) {
+        query.date.$lte = endDate;
+      }
+    }
+
+    const records = await this.attendanceModel
+      .find(query)
+      .populate('userId', 'firstName lastName email employeeId')
+      .sort({ checkInTime: -1 })
+      .lean();
+
+    return records.map((record: any) => ({
+      id: record._id.toString(),
+      userId: record.userId,
+      date: record.date,
+      checkInTime: record.checkInTime,
+      location: {
+        latitude: record.checkInLocation?.latitude,
+        longitude: record.checkInLocation?.longitude,
+        address: record.checkInLocation?.address,
+      },
+      status: record.status,
+    }));
+  }
 }

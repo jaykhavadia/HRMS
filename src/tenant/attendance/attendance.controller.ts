@@ -97,4 +97,50 @@ export class AttendanceController {
       end,
     );
   }
+
+  @Get('export')
+  async exportAttendance(
+    @CurrentUser() user: any,
+    @Query('userId') userId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const targetUserId =
+      user.role === 'admin' && userId
+        ? userId
+        : user.role === 'employee'
+          ? user.id
+          : null;
+
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+
+    const csvContent = await this.attendanceService.exportAttendanceRecords(
+      targetUserId || user.id,
+      user.organizationId,
+      start,
+      end,
+    );
+
+    return {
+      csv: csvContent,
+      filename: `attendance_export_${new Date().toISOString().split('T')[0]}.csv`,
+    };
+  }
+
+  @Get('map-locations')
+  async getMapLocations(
+    @CurrentUser() user: any,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+
+    return this.attendanceService.getCheckInLocationsForMap(
+      user.organizationId,
+      start,
+      end,
+    );
+  }
 }

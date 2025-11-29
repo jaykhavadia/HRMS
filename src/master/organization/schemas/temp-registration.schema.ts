@@ -40,6 +40,13 @@ export class TempRegistration {
 
   @Prop()
   verifiedAt?: Date;
+
+  // Registration agreement acceptance
+  @Prop({ default: false })
+  agreementAccepted: boolean;
+
+  @Prop()
+  agreementVersion?: string; // Version of agreement accepted
 }
 
 export const TempRegistrationSchema =

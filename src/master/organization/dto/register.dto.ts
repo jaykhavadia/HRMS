@@ -48,5 +48,10 @@ export class RegisterDto {
   @IsNotEmpty()
   @IsString()
   officeAddress: string;
+
+  @IsNotEmpty()
+  agreementAccepted: boolean; // Registration agreement acceptance
+
+  agreementVersion?: string; // Optional: version of agreement
 }
 
