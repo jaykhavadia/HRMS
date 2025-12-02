@@ -6,6 +6,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Attendance } from './schemas/attendance.schema';
 import { Organization } from '../../master/organization/schemas/organization.schema';
+import { User } from '../user/schemas/user.schema';
 import { FileUploadService } from '../../shared/file-upload/file-upload.service';
 import { ConfigService } from '../../config/config.service';
 import { CheckInDto } from './dto/check-in.dto';
@@ -17,6 +18,8 @@ export class AttendanceService {
     private attendanceModel: Model<Attendance>,
     @InjectModel(Organization.name)
     private organizationModel: Model<Organization>,
+    @InjectModel(User.name)
+    private userModel: Model<User>,
     private fileUploadService: FileUploadService,
     private configService: ConfigService,
   ) {}
@@ -71,37 +74,48 @@ export class AttendanceService {
   async checkIn(
     userId: string,
     checkInDto: CheckInDto,
-    selfieFile: Express.Multer.File,
+    selfieFile: Express.Multer.File | undefined,
     organizationId: string,
   ): Promise<any> {
+    // Get user to check if remote
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
     // Get organization to get office location
     const organization = await this.organizationModel.findById(organizationId);
     if (!organization) {
       throw new BadRequestException('Organization not found');
     }
 
-    // Validate location
-    const locationValidation = this.validateLocation(
-      checkInDto.latitude,
-      checkInDto.longitude,
-      organization.latitude,
-      organization.longitude,
-      organization.radius,
-    );
-
-    if (!locationValidation.isValid) {
-      const distance = locationValidation.distance || 0;
-      const radius = locationValidation.radius || 100;
-      throw new BadRequestException(
-        `You are not within the office location radius. Your distance: ${distance}m, Allowed radius: ${radius}m`,
+    // Validate location only if user is not remote
+    if (!user.remote) {
+      const locationValidation = this.validateLocation(
+        checkInDto.latitude,
+        checkInDto.longitude,
+        organization.latitude,
+        organization.longitude,
+        organization.radius,
       );
+
+      if (!locationValidation.isValid) {
+        const distance = locationValidation.distance || 0;
+        const radius = locationValidation.radius || 100;
+        throw new BadRequestException(
+          `You are not within the office location radius. Your distance: ${distance}m, Allowed radius: ${radius}m`,
+        );
+      }
     }
 
-    // Upload selfie
-    const selfiePath = await this.fileUploadService.uploadSelfie(
-      selfieFile,
-      userId,
-    );
+    // Upload selfie only if provided (optional)
+    let selfiePath: string | undefined;
+    if (selfieFile) {
+      selfiePath = await this.fileUploadService.uploadSelfie(
+        selfieFile,
+        userId,
+      );
+    }
 
     // Check if already checked in today
     const today = new Date();
@@ -134,7 +148,9 @@ export class AttendanceService {
       longitude: checkInDto.longitude,
       address: checkInDto.address || '',
     };
-    attendance.checkInSelfie = selfiePath;
+    if (selfiePath) {
+      attendance.checkInSelfie = selfiePath;
+    }
     attendance.status = 'checked-in';
 
     await attendance.save();
@@ -150,37 +166,48 @@ export class AttendanceService {
   async checkOut(
     userId: string,
     checkInDto: CheckInDto,
-    selfieFile: Express.Multer.File,
+    selfieFile: Express.Multer.File | undefined,
     organizationId: string,
   ): Promise<any> {
+    // Get user to check if remote
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
     // Get organization to get office location
     const organization = await this.organizationModel.findById(organizationId);
     if (!organization) {
       throw new BadRequestException('Organization not found');
     }
 
-    // Validate location
-    const locationValidation = this.validateLocation(
-      checkInDto.latitude,
-      checkInDto.longitude,
-      organization.latitude,
-      organization.longitude,
-      organization.radius,
-    );
-
-    if (!locationValidation.isValid) {
-      const distance = locationValidation.distance || 0;
-      const radius = locationValidation.radius || 100;
-      throw new BadRequestException(
-        `You are not within the office location radius. Your distance: ${distance}m, Allowed radius: ${radius}m`,
+    // Validate location only if user is not remote
+    if (!user.remote) {
+      const locationValidation = this.validateLocation(
+        checkInDto.latitude,
+        checkInDto.longitude,
+        organization.latitude,
+        organization.longitude,
+        organization.radius,
       );
+
+      if (!locationValidation.isValid) {
+        const distance = locationValidation.distance || 0;
+        const radius = locationValidation.radius || 100;
+        throw new BadRequestException(
+          `You are not within the office location radius. Your distance: ${distance}m, Allowed radius: ${radius}m`,
+        );
+      }
     }
 
-    // Upload selfie
-    const selfiePath = await this.fileUploadService.uploadSelfie(
-      selfieFile,
-      userId,
-    );
+    // Upload selfie only if provided (optional)
+    let selfiePath: string | undefined;
+    if (selfieFile) {
+      selfiePath = await this.fileUploadService.uploadSelfie(
+        selfieFile,
+        userId,
+      );
+    }
 
     // Find today's attendance
     const today = new Date();
@@ -209,7 +236,9 @@ export class AttendanceService {
       longitude: checkInDto.longitude,
       address: checkInDto.address || '',
     };
-    attendance.checkOutSelfie = selfiePath;
+    if (selfiePath) {
+      attendance.checkOutSelfie = selfiePath;
+    }
     attendance.status = 'checked-out';
 
     // Calculate total hours

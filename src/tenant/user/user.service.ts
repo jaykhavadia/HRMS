@@ -109,6 +109,7 @@ export class UserService {
           role: user.role,
           status: user.status,
           employeeId: user.employeeId,
+          remote: user.remote,
         };
   }
 
@@ -138,6 +139,19 @@ export class UserService {
       const row = data[i] as any;
       try {
         // Map Excel columns to user fields
+        // Handle remote field - can be boolean, string "true"/"false", or 1/0
+        const remoteValue = row['Remote'] || row['remote'] || row['Is Remote'] || row['isRemote'];
+        let remote = false;
+        if (remoteValue !== undefined && remoteValue !== null) {
+          if (typeof remoteValue === 'boolean') {
+            remote = remoteValue;
+          } else if (typeof remoteValue === 'string') {
+            remote = remoteValue.toLowerCase() === 'true' || remoteValue === '1' || remoteValue === 'yes';
+          } else if (typeof remoteValue === 'number') {
+            remote = remoteValue === 1;
+          }
+        }
+
         const userData: CreateUserDto = {
           firstName: row['First Name'] || row['firstName'] || row['First Name'],
           lastName: row['Last Name'] || row['lastName'] || row['Last Name'],
@@ -146,6 +160,7 @@ export class UserService {
             row['Mobile Number'] || row['mobileNumber'] || row['Mobile'],
           role: row['Role'] || row['role'] || 'employee',
           status: row['Status'] || row['status'] || 'active',
+          remote: remote, // Required field - default to false if not provided
         };
 
         // Validate required fields

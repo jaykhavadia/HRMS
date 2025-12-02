@@ -170,6 +170,7 @@ export class OrganizationService {
         status: 'active',
         organizationId: savedOrganization._id.toString(),
         employeeId: 'EMP001', // Admin is always the first employee
+        remote: false, // Admin is not remote by default
       });
 
       await adminUser.save();

@@ -4,6 +4,7 @@ import {
   IsString,
   IsOptional,
   IsEnum,
+  IsBoolean,
 } from 'class-validator';
 
 export class CreateUserDto {
@@ -30,4 +31,8 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(['active', 'inactive'])
   status?: string;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  remote: boolean; // If true, location validation is skipped for check-in/check-out
 }

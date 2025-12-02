@@ -225,7 +225,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"role\": \"employee\",\n  \"status\": \"active\"\n}",
+							"raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"role\": \"employee\",\n  \"status\": \"active\",\n  \"remote\": false\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -237,7 +237,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user"]
 						},
-						"description": "Create a new user. Admin only. Password setup email will be sent.\n\n**Important:**\n- Email must be unique across all organizations\n- Role can only be 'employee' (admin role is not allowed - only one admin per organization)\n- If role is not provided, defaults to 'employee'\n- Employee ID is auto-generated (EMP001, EMP002, etc.)\n- Admin user created during registration gets EMP001"
+						"description": "Create a new user. Admin only. Password setup email will be sent.\n\n**Important:**\n- Email must be unique across all organizations\n- Role can only be 'employee' (admin role is not allowed - only one admin per organization)\n- If role is not provided, defaults to 'employee'\n- Employee ID is auto-generated (EMP001, EMP002, etc.)\n- Admin user created during registration gets EMP001\n- **remote:** Boolean (required) - If true, location validation is skipped for check-in/check-out (can check in from anywhere). If false, must be within office radius."
 					},
 					"response": []
 				},
@@ -267,7 +267,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["user", "bulk-upload"]
 						},
-						"description": "Bulk upload users from Excel file. Admin only.\n\n**Excel Format:**\n- Columns: First Name, Last Name, Email, Mobile Number, Role, Status\n- All emails must be unique across all organizations\n- Role can only be 'employee' (admin role will be rejected)\n- Invalid rows will be skipped with error messages showing row numbers"
+						"description": "Bulk upload users from Excel file. Admin only.\n\n**Excel Format:**\n- Columns: First Name, Last Name, Email, Mobile Number, Role, Status, Remote\n- All emails must be unique across all organizations\n- Role can only be 'employee' (admin role will be rejected)\n- **Remote:** Boolean column (true/false, 1/0, or yes/no) - If true, location validation is skipped for check-in/check-out. Defaults to false if not provided.\n- Invalid rows will be skipped with error messages showing row numbers"
 					},
 					"response": []
 				},
@@ -332,7 +332,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"firstName\": \"Jane Updated\",\n  \"lastName\": \"Smith Updated\",\n  \"email\": \"jane.updated@example.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"status\": \"active\"\n}",
+							"raw": "{\n  \"firstName\": \"Jane Updated\",\n  \"lastName\": \"Smith Updated\",\n  \"email\": \"jane.updated@example.com\",\n  \"mobileNumber\": \"+1234567890\",\n  \"status\": \"active\",\n  \"remote\": false\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -351,7 +351,7 @@
 								}
 							]
 						},
-						"description": "Update user information. Admin only.\n\n**Important:**\n- Admin user CANNOT be updated (protected)\n- Email must be unique if being updated\n- Role cannot be updated (immutable)\n- All fields are optional - only provided fields will be updated"
+						"description": "Update user information. Admin only.\n\n**Important:**\n- Admin user CANNOT be updated (protected)\n- Email must be unique if being updated\n- Role cannot be updated (immutable)\n- **remote:** Boolean (optional) - If true, location validation is skipped for check-in/check-out. If false, must be within office radius.\n- All fields are optional - only provided fields will be updated"
 					},
 					"response": []
 				},
@@ -421,7 +421,7 @@
 									"key": "selfie",
 									"type": "file",
 									"src": [],
-									"description": "Selfie image (JPEG/PNG, max 5MB)"
+									"description": "Selfie image (JPEG/PNG, max 5MB) - OPTIONAL"
 								}
 							]
 						},
@@ -430,7 +430,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["attendance", "check-in"]
 						},
-						"description": "Check in with selfie and location. Uses form-data (multipart/form-data). Location must be within office radius.\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (required) - Selfie image (JPEG/PNG, max 5MB)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
+						"description": "Check in with location. Uses form-data (multipart/form-data).\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (optional) - Selfie image (JPEG/PNG, max 5MB)\n\n**Location Validation:**\n- If user.remote = false: Location must be within office radius (distance validation applies)\n- If user.remote = true: Location validation is skipped (can check in from anywhere)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
 					},
 					"response": []
 				},
@@ -465,7 +465,8 @@
 								{
 									"key": "selfie",
 									"type": "file",
-									"src": []
+									"src": [],
+									"description": "Selfie image (JPEG/PNG, max 5MB) - OPTIONAL"
 								}
 							]
 						},
@@ -474,7 +475,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["attendance", "check-out"]
 						},
-						"description": "Check out with selfie and location. Uses form-data (multipart/form-data). Location must be within office radius. Must have checked in first.\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (required) - Selfie image (JPEG/PNG, max 5MB)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
+						"description": "Check out with location. Uses form-data (multipart/form-data). Must have checked in first.\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (optional) - Selfie image (JPEG/PNG, max 5MB)\n\n**Location Validation:**\n- If user.remote = false: Location must be within office radius (distance validation applies)\n- If user.remote = true: Location validation is skipped (can check out from anywhere)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
 					},
 					"response": []
 				},

@@ -46,6 +46,9 @@ export class User {
 
   @Prop()
   passwordSetupTokenExpiry?: Date;
+
+  @Prop({ required: true, default: false })
+  remote: boolean; // If true, location validation is skipped for check-in/check-out
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

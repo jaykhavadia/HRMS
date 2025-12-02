@@ -35,7 +35,7 @@ export class AttendanceController {
   )
   async checkIn(
     @Body() checkInDto: CheckInDto,
-    @UploadedFile() selfieFile: Express.Multer.File,
+    @UploadedFile() selfieFile: Express.Multer.File | undefined,
     @CurrentUser() user: any,
   ) {
     return this.attendanceService.checkIn(
@@ -60,7 +60,7 @@ export class AttendanceController {
   )
   async checkOut(
     @Body() checkInDto: CheckInDto,
-    @UploadedFile() selfieFile: Express.Multer.File,
+    @UploadedFile() selfieFile: Express.Multer.File | undefined,
     @CurrentUser() user: any,
   ) {
     return this.attendanceService.checkOut(
