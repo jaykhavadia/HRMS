@@ -430,7 +430,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["attendance", "check-in"]
 						},
-						"description": "Check in with location. Uses form-data (multipart/form-data).\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (optional) - Selfie image (JPEG/PNG, max 5MB)\n\n**Location Validation:**\n- If user.remote = false: Location must be within office radius (distance validation applies)\n- If user.remote = true: Location validation is skipped (can check in from anywhere)\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
+						"description": "Check in with location. Uses form-data (multipart/form-data).\n\n**Form Data Fields:**\n- latitude: Number (required) - User's latitude\n- longitude: Number (required) - User's longitude\n- address: String (optional) - Address text\n- selfie: File (optional) - Selfie image (JPEG/PNG, max 5MB)\n\n**Location Validation:**\n- If user.remote = false: Location must be within office radius (distance validation applies)\n- If user.remote = true: Location validation is skipped (can check in from anywhere)\n\n**Shift Validation:**\n- Checks user's assigned shift (or default shift if none assigned)\n- Blocks check-in if today is an off day (days array has 0 for current day)\n- Calculates attendanceStatus based on check-in time:\n  - \"before-time\": check-in time < start time\n  - \"on-time\": start time ≤ check-in time ≤ late time\n  - \"late\": check-in time > late time\n\n**Returns:**\n- attendanceStatus: \"on-time\" | \"before-time\" | \"late\"\n\n**Note:** Form data sends strings, but latitude/longitude are automatically converted to numbers."
 					},
 					"response": []
 				},
@@ -579,6 +579,211 @@
 							]
 						},
 						"description": "Get check-in locations for map visualization. Returns all check-in locations with coordinates and user info.\n\n**Returns:**\n- Array of check-in locations with:\n  - userId (with firstName, lastName, email, employeeId)\n  - checkInTime\n  - location (latitude, longitude, address)\n  - status\n\n**Use Case:** Display check-in pin points on a map in the dashboard."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Shift",
+			"item": [
+				{
+					"name": "Create Shift",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Morning Shift\",\n  \"startTime\": \"08:00\",\n  \"endTime\": \"16:00\",\n  \"lateTime\": \"08:30\",\n  \"days\": [0, 1, 1, 1, 1, 1, 0]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/shift",
+							"host": ["{{base_url}}"],
+							"path": ["shift"]
+						},
+						"description": "Create a new shift for the organization. Admin only.\n\n**Fields:**\n- name: String (required) - Shift name (unique per organization)\n- startTime: String (required) - Start time in HH:mm format (24-hour, e.g., \"08:00\")\n- endTime: String (required) - End time in HH:mm format (24-hour, e.g., \"16:00\")\n- lateTime: String (required) - Late time in HH:mm format (24-hour, e.g., \"08:30\"). Must be between startTime and endTime\n- days: Array (required) - Array of 7 numbers [Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday]\n  - 0 = off day, 1 = working day\n  - Example: [0, 1, 1, 1, 1, 1, 0] = Monday to Friday working\n\n**Limits:**\n- Maximum 10 shifts per organization\n- Shift name must be unique per organization\n\n**Note:** Default shift is global and cannot be created, updated, or deleted. It's automatically available to all users without a custom shift assignment."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Shifts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/shift",
+							"host": ["{{base_url}}"],
+							"path": ["shift"]
+						},
+						"description": "Get all shifts for the organization (including default shift).\n\n**Returns:**\n- Array of shifts with:\n  - id: Shift ID (\"default\" for default shift)\n  - name: Shift name\n  - startTime: Start time (HH:mm)\n  - endTime: End time (HH:mm)\n  - lateTime: Late time (HH:mm)\n  - days: Array of 7 numbers [Sunday to Saturday]\n  - organizationId: Organization ID (included for default shift too)\n  - isDefault: Boolean (true for default shift)\n  - createdAt, updatedAt: Timestamps (null for default shift)\n\n**Note:** Default shift is always included at the beginning of the array."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Shift By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/shift/:id",
+							"host": ["{{base_url}}"],
+							"path": ["shift", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{shift_id}}",
+									"description": "Shift ID or 'default' for default shift"
+								}
+							]
+						},
+						"description": "Get shift by ID. Use 'default' to get the default shift.\n\n**Returns:**\n- Shift object with all details\n- Default shift can be retrieved using id: 'default'"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Shift",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Morning Shift Updated\",\n  \"startTime\": \"08:30\",\n  \"endTime\": \"16:30\",\n  \"lateTime\": \"09:00\",\n  \"days\": [0, 1, 1, 1, 1, 1, 0]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/shift/:id",
+							"host": ["{{base_url}}"],
+							"path": ["shift", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{shift_id}}",
+									"description": "Shift ID (cannot be 'default')"
+								}
+							]
+						},
+						"description": "Update shift. Admin only.\n\n**Fields:**\n- All fields are optional - only provided fields will be updated\n- name: String (optional)\n- startTime: String (optional) - HH:mm format\n- endTime: String (optional) - HH:mm format\n- lateTime: String (optional) - HH:mm format (must be between startTime and endTime)\n- days: Array (optional) - Array of 7 numbers [Sunday to Saturday]\n\n**Note:** Default shift cannot be updated. Only organization-specific shifts can be updated."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Shift",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/shift/:id",
+							"host": ["{{base_url}}"],
+							"path": ["shift", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{shift_id}}",
+									"description": "Shift ID (cannot be 'default')"
+								}
+							]
+						},
+						"description": "Delete shift. Admin only.\n\n**Validation:**\n- Cannot delete if any users are assigned to this shift\n- Default shift cannot be deleted\n\n**Error:** If users are assigned, returns error with count of assigned users. Reassign users first."
+					},
+					"response": []
+				},
+				{
+					"name": "Assign Shift to User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"shiftId\": \"{{shift_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/shift/assign",
+							"host": ["{{base_url}}"],
+							"path": ["shift", "assign"]
+						},
+						"description": "Assign a shift to a user. Admin only.\n\n**Fields:**\n- userId: String (required) - User ID to assign shift to\n- shiftId: String (required) - Shift ID to assign (cannot be 'default')\n\n**Validation:**\n- User must belong to the organization\n- Shift must belong to the organization\n- Default shift cannot be assigned explicitly (remove shift assignment to use default)\n\n**Note:** If user has no shift assigned, default shift is automatically used."
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Shift from User",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/shift/assign/:userId",
+							"host": ["{{base_url}}"],
+							"path": ["shift", "assign", ":userId"],
+							"variable": [
+								{
+									"key": "userId",
+									"value": "{{user_id}}",
+									"description": "User ID to remove shift assignment from"
+								}
+							]
+						},
+						"description": "Remove shift assignment from user. User will use default shift. Admin only.\n\n**Note:** After removal, user will automatically use the default shift for attendance calculations."
 					},
 					"response": []
 				}

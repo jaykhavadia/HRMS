@@ -8,7 +8,11 @@ export class Attendance {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   userId: string;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Organization',
+    required: true,
+  })
   organizationId: string;
 
   @Prop({ required: true, default: Date.now })
@@ -58,6 +62,12 @@ export class Attendance {
     default: 'checked-in',
   })
   status: string;
+
+  @Prop({
+    type: String,
+    enum: ['on-time', 'before-time', 'late'],
+  })
+  attendanceStatus?: string; // Calculated on check-in based on shift times
 
   @Prop()
   totalHours?: number;

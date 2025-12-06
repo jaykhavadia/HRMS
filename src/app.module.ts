@@ -11,6 +11,7 @@ import { AuthModule } from './tenant/auth/auth.module';
 import { UserModule } from './tenant/user/user.module';
 import { AttendanceModule } from './tenant/attendance/attendance.module';
 import { DashboardModule } from './tenant/dashboard/dashboard.module';
+import { ShiftModule } from './tenant/shift/shift.module';
 import { CommonModule } from './common/common.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
@@ -26,6 +27,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     UserModule,
     AttendanceModule,
     DashboardModule,
+    ShiftModule,
     CommonModule,
     ScheduleModule.forRoot(), // For background jobs
   ],

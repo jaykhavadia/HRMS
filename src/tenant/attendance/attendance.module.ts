@@ -8,6 +8,7 @@ import { User, UserSchema } from '../user/schemas/user.schema';
 import { DatabaseModule } from '../../core/database/database.module';
 import { FileUploadModule } from '../../shared/file-upload/file-upload.module';
 import { ConfigModule } from '../../config/config.module';
+import { ShiftModule } from '../shift/shift.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ConfigModule } from '../../config/config.module';
     ]),
     FileUploadModule,
     ConfigModule,
+    ShiftModule,
   ],
   controllers: [AttendanceController],
   providers: [AttendanceService],

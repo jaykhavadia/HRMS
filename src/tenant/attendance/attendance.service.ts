@@ -10,6 +10,7 @@ import { User } from '../user/schemas/user.schema';
 import { FileUploadService } from '../../shared/file-upload/file-upload.service';
 import { ConfigService } from '../../config/config.service';
 import { CheckInDto } from './dto/check-in.dto';
+import { ShiftService } from '../shift/shift.service';
 
 @Injectable()
 export class AttendanceService {
@@ -22,6 +23,7 @@ export class AttendanceService {
     private userModel: Model<User>,
     private fileUploadService: FileUploadService,
     private configService: ConfigService,
+    private shiftService: ShiftService,
   ) {}
 
   /**
@@ -71,6 +73,43 @@ export class AttendanceService {
     };
   }
 
+  /**
+   * Calculate attendance status based on check-in time
+   * - "before-time": check-in time < start time
+   * - "on-time": start time ≤ check-in time ≤ late time
+   * - "late": check-in time > late time
+   */
+  private calculateAttendanceStatus(
+    checkInTime: Date,
+    startTime: string,
+    lateTime: string,
+  ): 'on-time' | 'before-time' | 'late' {
+    const checkInMinutes = this.timeToMinutes(checkInTime);
+    const startMinutes = this.timeToMinutes(startTime);
+    const lateMinutes = this.timeToMinutes(lateTime);
+
+    if (checkInMinutes < startMinutes) {
+      return 'before-time';
+    } else if (checkInMinutes <= lateMinutes) {
+      return 'on-time';
+    } else {
+      return 'late';
+    }
+  }
+
+  /**
+   * Helper: Convert time string (HH:mm) to minutes
+   */
+  private timeToMinutes(time: string | Date): number {
+    if (time instanceof Date) {
+      const hours = time.getHours();
+      const minutes = time.getMinutes();
+      return hours * 60 + minutes;
+    }
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
   async checkIn(
     userId: string,
     checkInDto: CheckInDto,
@@ -108,6 +147,17 @@ export class AttendanceService {
       }
     }
 
+    // Get user's shift (custom or default)
+    const shift = await this.shiftService.getUserShift(userId, organizationId);
+
+    // Check if today is an off day
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    
+    if (shift.days[dayOfWeek] === 0) {
+      throw new BadRequestException('Today is your weekly off day');
+    }
+
     // Upload selfie only if provided (optional)
     let selfiePath: string | undefined;
     if (selfieFile) {
@@ -134,6 +184,14 @@ export class AttendanceService {
       throw new BadRequestException('You have already checked in today');
     }
 
+    // Calculate attendance status based on check-in time
+    const checkInTime = new Date();
+    const attendanceStatus = this.calculateAttendanceStatus(
+      checkInTime,
+      shift.startTime,
+      shift.lateTime,
+    );
+
     const attendance = existingAttendance
       ? existingAttendance
       : new this.attendanceModel({
@@ -142,7 +200,7 @@ export class AttendanceService {
           date: today,
         });
 
-    attendance.checkInTime = new Date();
+    attendance.checkInTime = checkInTime;
     attendance.checkInLocation = {
       latitude: checkInDto.latitude,
       longitude: checkInDto.longitude,
@@ -151,6 +209,7 @@ export class AttendanceService {
     if (selfiePath) {
       attendance.checkInSelfie = selfiePath;
     }
+    attendance.attendanceStatus = attendanceStatus;
     attendance.status = 'checked-in';
 
     await attendance.save();
@@ -159,6 +218,7 @@ export class AttendanceService {
       id: attendance._id.toString(),
       checkInTime: attendance.checkInTime,
       status: attendance.status,
+      attendanceStatus: attendance.attendanceStatus,
       message: 'Checked in successfully',
     };
   }

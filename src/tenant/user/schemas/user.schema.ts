@@ -49,6 +49,9 @@ export class User {
 
   @Prop({ required: true, default: false })
   remote: boolean; // If true, location validation is skipped for check-in/check-out
+
+  @Prop({ type: 'ObjectId', ref: 'Shift' })
+  shiftId?: string; // Optional - if not assigned, default shift is used
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
