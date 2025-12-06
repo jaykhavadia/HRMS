@@ -1,10 +1,11 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, createConnection } from 'mongoose';
 import { ConfigService } from '../../config/config.service';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit {
+  private readonly logger = new Logger(DatabaseService.name);
   private tenantConnections: Map<string, Connection> = new Map();
 
   constructor(
@@ -14,6 +15,28 @@ export class DatabaseService implements OnModuleInit {
 
   onModuleInit() {
     // Master connection is already established via MongooseModule
+    this.logger.log('=== DatabaseService Initialized ===');
+    this.logger.log(`Master connection state: ${this.masterConnection.readyState}`);
+    this.logger.log(`Master connection name: ${this.masterConnection.name}`);
+    this.logger.log(`Master connection host: ${this.masterConnection.host}`);
+    this.logger.log(`Master connection port: ${this.masterConnection.port}`);
+    
+    // Set up connection event listeners for debugging
+    this.masterConnection.on('connected', () => {
+      this.logger.log('✅ Master database connected successfully');
+    });
+    
+    this.masterConnection.on('error', (error) => {
+      this.logger.error('❌ Master database connection error:', error.message);
+    });
+    
+    this.masterConnection.on('disconnected', () => {
+      this.logger.warn('⚠️  Master database disconnected');
+    });
+    
+    this.masterConnection.on('reconnected', () => {
+      this.logger.log('🔄 Master database reconnected');
+    });
   }
 
   /**
@@ -48,9 +71,12 @@ export class DatabaseService implements OnModuleInit {
     const dbName = this.getTenantDbName(clientId, clientName);
     const connectionKey = `${clientId}_${dbName}`;
 
+    this.logger.debug(`Getting tenant connection for: ${connectionKey}`);
+
     if (this.tenantConnections.has(connectionKey)) {
       const existingConnection = this.tenantConnections.get(connectionKey);
       if (existingConnection) {
+        this.logger.debug(`Using existing tenant connection: ${connectionKey}`);
         return existingConnection;
       }
     }
@@ -59,10 +85,24 @@ export class DatabaseService implements OnModuleInit {
     const baseUri = this.configService.getMasterDbUri();
     const connectionUri = this.getTenantConnectionUri(baseUri, dbName);
 
-    const connection = await createConnection(connectionUri).asPromise();
-    this.tenantConnections.set(connectionKey, connection);
+    this.logger.log(`Creating new tenant connection: ${connectionKey}`);
+    this.logger.debug(`Tenant connection URI: ${this.maskUri(connectionUri)}`);
 
-    return connection;
+    try {
+      const connection = await createConnection(connectionUri).asPromise();
+      this.tenantConnections.set(connectionKey, connection);
+      this.logger.log(`✅ Tenant connection created successfully: ${connectionKey}`);
+      return connection;
+    } catch (error) {
+      this.logger.error(`❌ Failed to create tenant connection: ${connectionKey}`, error.message);
+      throw error;
+    }
+  }
+
+  private maskUri(uri: string): string {
+    if (!uri) return 'empty';
+    // Mask password in MongoDB URI
+    return uri.replace(/:([^:@]+)@/, ':***@');
   }
 
   /**
