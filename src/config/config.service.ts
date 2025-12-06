@@ -45,4 +45,13 @@ export class ConfigService {
   getOfficeLocationRadius(): number {
     return parseFloat(this.get('OFFICE_LOCATION_RADIUS') || '100'); // meters
   }
+
+  getGoogleDriveConfig() {
+    return {
+      serviceAccountPath: this.get('GOOGLE_DRIVE_SERVICE_ACCOUNT_PATH'),
+      serviceAccountEmail: this.get('GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL'),
+      privateKey: this.get('GOOGLE_DRIVE_PRIVATE_KEY'),
+      projectId: this.get('GOOGLE_DRIVE_PROJECT_ID'),
+    };
+  }
 }

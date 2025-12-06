@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Attendance } from './schemas/attendance.schema';
@@ -154,20 +151,11 @@ export class AttendanceService {
     const now = new Date();
     const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
     
-    if (shift.days[dayOfWeek] === 0) {
+    if (shift.days[dayOfWeek] === 1) {
       throw new BadRequestException('Today is your weekly off day');
     }
 
-    // Upload selfie only if provided (optional)
-    let selfiePath: string | undefined;
-    if (selfieFile) {
-      selfiePath = await this.fileUploadService.uploadSelfie(
-        selfieFile,
-        userId,
-      );
-    }
-
-    // Check if already checked in today
+    // Check if already checked in today (BEFORE uploading image)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -182,6 +170,19 @@ export class AttendanceService {
 
     if (existingAttendance && existingAttendance.checkInTime) {
       throw new BadRequestException('You have already checked in today');
+    }
+
+    // Upload selfie only if provided (optional) - AFTER all validations pass
+    let selfiePath: string | undefined;
+    if (selfieFile) {
+      const employeeName = `${user.firstName} ${user.lastName}`.trim();
+      selfiePath = await this.fileUploadService.uploadSelfie(
+        selfieFile,
+        userId,
+        organization.companyName,
+        employeeName,
+        'check-in',
+      );
     }
 
     // Calculate attendance status based on check-in time
@@ -260,16 +261,7 @@ export class AttendanceService {
       }
     }
 
-    // Upload selfie only if provided (optional)
-    let selfiePath: string | undefined;
-    if (selfieFile) {
-      selfiePath = await this.fileUploadService.uploadSelfie(
-        selfieFile,
-        userId,
-      );
-    }
-
-    // Find today's attendance
+    // Find today's attendance (BEFORE uploading image)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -288,6 +280,19 @@ export class AttendanceService {
 
     if (attendance.checkOutTime) {
       throw new BadRequestException('You have already checked out today');
+    }
+
+    // Upload selfie only if provided (optional) - AFTER all validations pass
+    let selfiePath: string | undefined;
+    if (selfieFile) {
+      const employeeName = `${user.firstName} ${user.lastName}`.trim();
+      selfiePath = await this.fileUploadService.uploadSelfie(
+        selfieFile,
+        userId,
+        organization.companyName,
+        employeeName,
+        'check-out',
+      );
     }
 
     attendance.checkOutTime = new Date();

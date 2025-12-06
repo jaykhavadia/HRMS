@@ -72,6 +72,8 @@ export class ShiftService {
 
     await shift.save();
 
+    const shiftDoc = shift as any;
+
     return {
       id: shift._id.toString(),
       name: shift.name,
@@ -80,8 +82,8 @@ export class ShiftService {
       lateTime: shift.lateTime,
       days: shift.days,
       organizationId: shift.organizationId.toString(),
-      createdAt: shift.createdAt,
-      updatedAt: shift.updatedAt,
+      createdAt: shiftDoc.createdAt,
+      updatedAt: shiftDoc.updatedAt,
     };
   }
 
@@ -160,6 +162,8 @@ export class ShiftService {
       );
     }
 
+    const shiftDoc = shift as any;
+
     return {
       id: shift._id.toString(),
       name: shift.name,
@@ -169,8 +173,8 @@ export class ShiftService {
       days: shift.days,
       organizationId: shift.organizationId.toString(),
       isDefault: false,
-      createdAt: shift.createdAt,
-      updatedAt: shift.updatedAt,
+      createdAt: shiftDoc.createdAt,
+      updatedAt: shiftDoc.updatedAt,
     };
   }
 
@@ -232,6 +236,8 @@ export class ShiftService {
     Object.assign(shift, updateShiftDto);
     await shift.save();
 
+    const shiftDoc = shift as any;
+
     return {
       id: shift._id.toString(),
       name: shift.name,
@@ -241,8 +247,8 @@ export class ShiftService {
       days: shift.days,
       organizationId: shift.organizationId.toString(),
       isDefault: false,
-      createdAt: shift.createdAt,
-      updatedAt: shift.updatedAt,
+      createdAt: shiftDoc.createdAt,
+      updatedAt: shiftDoc.updatedAt,
     };
   }
 

@@ -14,6 +14,7 @@ import { DashboardModule } from './tenant/dashboard/dashboard.module';
 import { ShiftModule } from './tenant/shift/shift.module';
 import { CommonModule } from './common/common.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { GoogleOAuthModule } from './master/google-oauth/google-oauth.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     DashboardModule,
     ShiftModule,
     CommonModule,
+    GoogleOAuthModule,
     ScheduleModule.forRoot(), // For background jobs
   ],
   controllers: [AppController],
