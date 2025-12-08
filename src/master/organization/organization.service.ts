@@ -53,7 +53,9 @@ export class OrganizationService {
   /**
    * Step 2: Register organization (store in temp table and send OTP)
    */
-  async register(dto: RegisterDto): Promise<{ message: string; email: string }> {
+  async register(
+    dto: RegisterDto,
+  ): Promise<{ message: string; email: string }> {
     // Validate password match
     if (dto.password !== dto.confirmPassword) {
       throw new BadRequestException('Passwords do not match');
@@ -100,7 +102,6 @@ export class OrganizationService {
       otpExpiry,
       isVerified: false,
       agreementAccepted: dto.agreementAccepted || false,
-      agreementVersion: dto.agreementVersion,
     });
 
     await tempRegistration.save();
@@ -109,7 +110,8 @@ export class OrganizationService {
     await this.emailService.sendOtpEmail(dto.email, otp, dto.companyName);
 
     return {
-      message: 'Registration successful. Please check your email for OTP verification.',
+      message:
+        'Registration successful. Please check your email for OTP verification.',
       email: dto.email,
     };
   }
@@ -125,9 +127,7 @@ export class OrganizationService {
     });
 
     if (!tempRegistration) {
-      throw new NotFoundException(
-        'Registration not found or already verified',
-      );
+      throw new NotFoundException('Registration not found or already verified');
     }
 
     // Check OTP expiry
@@ -188,7 +188,8 @@ export class OrganizationService {
       );
 
       return {
-        message: 'Registration verified successfully. Please login to continue.',
+        message:
+          'Registration verified successfully. Please login to continue.',
       };
     } catch (error) {
       // Rollback: delete organization if user creation fails
@@ -234,7 +235,6 @@ export class OrganizationService {
       weeklyOffDays: organization.weeklyOffDays || [],
       agreementAccepted: organization.agreementAccepted || false,
       agreementAcceptedAt: organization.agreementAcceptedAt,
-      agreementVersion: organization.agreementVersion,
       isActive: organization.isActive,
       createdAt: organization.createdAt,
       updatedAt: organization.updatedAt,

@@ -37,4 +37,3 @@ export function decodeTokenWithTenant(
 
   return { tenantDomain: tenantDomain.trim(), token: token.trim() };
 }
-

@@ -215,12 +215,15 @@ export class ShiftService {
     }
 
     // Validate times if provided
-    const startTime =
-      updateShiftDto.startTime || shift.startTime;
+    const startTime = updateShiftDto.startTime || shift.startTime;
     const lateTime = updateShiftDto.lateTime || shift.lateTime;
     const endTime = updateShiftDto.endTime || shift.endTime;
 
-    if (updateShiftDto.startTime || updateShiftDto.lateTime || updateShiftDto.endTime) {
+    if (
+      updateShiftDto.startTime ||
+      updateShiftDto.lateTime ||
+      updateShiftDto.endTime
+    ) {
       const startMinutes = this.timeToMinutes(startTime);
       const lateMinutes = this.timeToMinutes(lateTime);
       const endMinutes = this.timeToMinutes(endTime);
@@ -305,9 +308,7 @@ export class ShiftService {
 
     // Verify user belongs to organization
     if (user.organizationId.toString() !== organizationId) {
-      throw new ForbiddenException(
-        'User does not belong to your organization',
-      );
+      throw new ForbiddenException('User does not belong to your organization');
     }
 
     // Prevent assigning default shift explicitly
@@ -356,9 +357,7 @@ export class ShiftService {
 
     // Verify user belongs to organization
     if (user.organizationId.toString() !== organizationId) {
-      throw new ForbiddenException(
-        'User does not belong to your organization',
-      );
+      throw new ForbiddenException('User does not belong to your organization');
     }
 
     // Remove shift assignment (will use default shift)
@@ -422,4 +421,3 @@ export class ShiftService {
     return hours * 60 + minutes;
   }
 }
-

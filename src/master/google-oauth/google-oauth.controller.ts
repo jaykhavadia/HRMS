@@ -78,7 +78,3 @@ export class GoogleOAuthController {
     };
   }
 }
-
-
-
-

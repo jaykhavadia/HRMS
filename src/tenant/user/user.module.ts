@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { User, UserSchema } from './schemas/user.schema';
+import { Shift, ShiftSchema } from '../shift/schemas/shift.schema';
 import { DatabaseModule } from '../../core/database/database.module';
 import { EmailModule } from '../../shared/email/email.module';
 import { FileUploadModule } from '../../shared/file-upload/file-upload.module';
@@ -11,7 +12,10 @@ import { ConfigModule } from '../../config/config.module';
 @Module({
   imports: [
     DatabaseModule,
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: Shift.name, schema: ShiftSchema },
+    ]),
     EmailModule,
     FileUploadModule,
     ConfigModule,

@@ -34,7 +34,3 @@ export class GoogleOAuth {
 }
 
 export const GoogleOAuthSchema = SchemaFactory.createForClass(GoogleOAuth);
-
-
-
-

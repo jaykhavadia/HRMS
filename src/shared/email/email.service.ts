@@ -90,7 +90,11 @@ export class EmailService {
     }
   }
 
-  async sendOtpEmail(to: string, otp: string, companyName: string): Promise<void> {
+  async sendOtpEmail(
+    to: string,
+    otp: string,
+    companyName: string,
+  ): Promise<void> {
     const mailOptions = {
       from: this.configService.get('EMAIL_USER'),
       to,

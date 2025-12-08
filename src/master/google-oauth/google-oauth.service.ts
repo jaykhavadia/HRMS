@@ -16,7 +16,9 @@ export class GoogleOAuthService {
   /**
    * Get active OAuth credentials (defaults to 'default' if name not provided)
    */
-  async getActiveCredentials(name: string = 'default'): Promise<GoogleOAuthDocument> {
+  async getActiveCredentials(
+    name: string = 'default',
+  ): Promise<GoogleOAuthDocument> {
     const credentials = await this.googleOAuthModel.findOne({
       name,
       isActive: true,
@@ -52,7 +54,9 @@ export class GoogleOAuthService {
       { upsert: true, new: true },
     );
 
-    this.logger.log(`OAuth credentials ${name} ${credentials.isNew ? 'created' : 'updated'}`);
+    this.logger.log(
+      `OAuth credentials ${name} ${credentials.isNew ? 'created' : 'updated'}`,
+    );
     return credentials;
   }
 
@@ -75,7 +79,8 @@ export class GoogleOAuthService {
     });
 
     try {
-      const { credentials: newCredentials } = await oauth2Client.refreshAccessToken();
+      const { credentials: newCredentials } =
+        await oauth2Client.refreshAccessToken();
 
       if (!newCredentials.access_token) {
         throw new Error('Failed to get access token from refresh');
@@ -96,14 +101,18 @@ export class GoogleOAuthService {
         },
       );
 
-      this.logger.log(`Access token refreshed for ${name}, expires at ${expiryDate.toISOString()}`);
+      this.logger.log(
+        `Access token refreshed for ${name}, expires at ${expiryDate.toISOString()}`,
+      );
 
       return {
         accessToken: newCredentials.access_token,
         expiryDate,
       };
     } catch (error: any) {
-      this.logger.error(`Failed to refresh access token for ${name}: ${error.message}`);
+      this.logger.error(
+        `Failed to refresh access token for ${name}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -167,7 +176,3 @@ export class GoogleOAuthService {
     this.logger.log(`OAuth credentials ${name} deactivated`);
   }
 }
-
-
-
-

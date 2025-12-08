@@ -48,4 +48,3 @@ export class UpdateCompanyProfileDto {
   @Min(0)
   radius?: number;
 }
-

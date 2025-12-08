@@ -3,7 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
 import { Attendance, AttendanceSchema } from './schemas/attendance.schema';
-import { Organization, OrganizationSchema } from '../../master/organization/schemas/organization.schema';
+import {
+  Organization,
+  OrganizationSchema,
+} from '../../master/organization/schemas/organization.schema';
 import { User, UserSchema } from '../user/schemas/user.schema';
 import { DatabaseModule } from '../../core/database/database.module';
 import { FileUploadModule } from '../../shared/file-upload/file-upload.module';

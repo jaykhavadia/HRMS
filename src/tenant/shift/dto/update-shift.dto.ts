@@ -45,4 +45,3 @@ export class UpdateShiftDto {
   @Max(1, { each: true, message: 'Each day value must be 0 or 1' })
   days?: number[];
 }
-

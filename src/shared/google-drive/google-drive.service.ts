@@ -1,4 +1,10 @@
-import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 import { ConfigService } from '../../config/config.service';
@@ -14,7 +20,7 @@ export class GoogleDriveService implements OnModuleInit {
 
   constructor(
     private configService: ConfigService,
-    private googleOAuthService?: GoogleOAuthService,
+    @Optional() private googleOAuthService?: GoogleOAuthService,
   ) {
     // Don't initialize here - wait for OnModuleInit to ensure OAuth service is ready
   }
@@ -28,14 +34,19 @@ export class GoogleDriveService implements OnModuleInit {
       // Option 1: Try OAuth2 from database (highest priority)
       if (this.googleOAuthService) {
         try {
-          const oauth2Client = await this.googleOAuthService.getOAuth2Client('default');
+          const oauth2Client =
+            await this.googleOAuthService.getOAuth2Client('default');
           this.auth = oauth2Client;
           this.drive = google.drive({ version: 'v3', auth: this.auth });
           this.useOAuth2 = true;
-          this.logger.log('Google Drive initialized using OAuth2 from database');
+          this.logger.log(
+            'Google Drive initialized using OAuth2 from database',
+          );
           return;
         } catch (error: any) {
-          this.logger.warn(`OAuth2 from database failed: ${error.message}, falling back to service account`);
+          this.logger.warn(
+            `OAuth2 from database failed: ${error.message}, falling back to service account`,
+          );
         }
       }
 
@@ -53,7 +64,9 @@ export class GoogleDriveService implements OnModuleInit {
           ],
         });
         this.drive = google.drive({ version: 'v3', auth: this.auth });
-        this.logger.log('Google Drive initialized using service account JSON file');
+        this.logger.log(
+          'Google Drive initialized using service account JSON file',
+        );
         return;
       }
 
@@ -75,7 +88,9 @@ export class GoogleDriveService implements OnModuleInit {
           ],
         });
         this.drive = google.drive({ version: 'v3', auth: this.auth });
-        this.logger.log('Google Drive initialized using service account from env');
+        this.logger.log(
+          'Google Drive initialized using service account from env',
+        );
         return;
       }
 
@@ -95,7 +110,8 @@ export class GoogleDriveService implements OnModuleInit {
   private async ensureValidAuth() {
     if (this.useOAuth2 && this.googleOAuthService) {
       try {
-        const oauth2Client = await this.googleOAuthService.getOAuth2Client('default');
+        const oauth2Client =
+          await this.googleOAuthService.getOAuth2Client('default');
         this.auth = oauth2Client;
         this.drive = google.drive({ version: 'v3', auth: this.auth });
       } catch (error: any) {
@@ -180,7 +196,7 @@ export class GoogleDriveService implements OnModuleInit {
   ): Promise<string> {
     // Ensure we have a valid auth token (refresh if needed for OAuth2)
     await this.ensureValidAuth();
-    
+
     try {
       // Get or create root folder
       const rootFolderId = await this.getOrCreateRootFolder();
@@ -211,7 +227,7 @@ export class GoogleDriveService implements OnModuleInit {
 
       // Convert Buffer to Stream (Google Drive API requires a stream)
       const stream = Readable.from(fileBuffer);
-      
+
       const media = {
         mimeType: mimeType,
         body: stream,
@@ -279,4 +295,3 @@ export class GoogleDriveService implements OnModuleInit {
     }
   }
 }
-

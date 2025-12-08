@@ -44,9 +44,6 @@ export class TempRegistration {
   // Registration agreement acceptance
   @Prop({ default: false })
   agreementAccepted: boolean;
-
-  @Prop()
-  agreementVersion?: string; // Version of agreement accepted
 }
 
 export const TempRegistrationSchema =
@@ -55,4 +52,3 @@ export const TempRegistrationSchema =
 // Index for cleanup job
 TempRegistrationSchema.index({ createdAt: 1 });
 TempRegistrationSchema.index({ otpExpiry: 1 });
-

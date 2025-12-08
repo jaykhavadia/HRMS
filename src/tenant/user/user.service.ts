@@ -8,11 +8,13 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from './schemas/user.schema';
+import { Shift } from '../shift/schemas/shift.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { EmailService } from '../../shared/email/email.service';
 import { ConfigService } from '../../config/config.service';
 import { FileUploadService } from '../../shared/file-upload/file-upload.service';
+import { DEFAULT_SHIFT } from '../../common/constants/shift.constants';
 import { v4 as uuidv4 } from 'uuid';
 import * as xlsx from 'xlsx';
 
@@ -21,6 +23,8 @@ export class UserService {
   constructor(
     @InjectModel(User.name)
     private userModel: Model<User>,
+    @InjectModel(Shift.name)
+    private shiftModel: Model<Shift>,
     private emailService: EmailService,
     private configService: ConfigService,
     private fileUploadService: FileUploadService,
@@ -101,16 +105,16 @@ export class UserService {
       setupUrl,
     );
 
-        return {
-          id: user._id.toString(),
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          status: user.status,
-          employeeId: user.employeeId,
-          remote: user.remote,
-        };
+    return {
+      id: user._id.toString(),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      status: user.status,
+      employeeId: user.employeeId,
+      remote: user.remote,
+    };
   }
 
   async bulkUploadUsers(
@@ -140,13 +144,17 @@ export class UserService {
       try {
         // Map Excel columns to user fields
         // Handle remote field - can be boolean, string "true"/"false", or 1/0
-        const remoteValue = row['Remote'] || row['remote'] || row['Is Remote'] || row['isRemote'];
+        const remoteValue =
+          row['Remote'] || row['remote'] || row['Is Remote'] || row['isRemote'];
         let remote = false;
         if (remoteValue !== undefined && remoteValue !== null) {
           if (typeof remoteValue === 'boolean') {
             remote = remoteValue;
           } else if (typeof remoteValue === 'string') {
-            remote = remoteValue.toLowerCase() === 'true' || remoteValue === '1' || remoteValue === 'yes';
+            remote =
+              remoteValue.toLowerCase() === 'true' ||
+              remoteValue === '1' ||
+              remoteValue === 'yes';
           } else if (typeof remoteValue === 'number') {
             remote = remoteValue === 1;
           }
@@ -246,21 +254,62 @@ export class UserService {
 
     const users = await this.userModel.find(query).select('-password').lean();
 
-    return users.map((user: any) => ({
-      id: user._id.toString(),
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      mobileNumber: user.mobileNumber,
-      role: user.role,
-      status: user.status,
-      employeeId: user.employeeId,
-      remote: user.remote,
-      shiftId: user.shiftId ? user.shiftId.toString() : null,
-      organizationId: user.organizationId.toString(),
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    }));
+    // Fetch shifts for all users in parallel
+    const usersWithShifts = await Promise.all(
+      users.map(async (user: any) => {
+        let shift: any = null;
+
+        // If user has a shift assigned (not null/undefined), fetch it
+        if (user.shiftId) {
+          const shiftDoc = await this.shiftModel.findById(user.shiftId).lean();
+          if (shiftDoc) {
+            shift = {
+              id: shiftDoc._id.toString(),
+              name: shiftDoc.name,
+              startTime: shiftDoc.startTime,
+              endTime: shiftDoc.endTime,
+              lateTime: shiftDoc.lateTime,
+              days: shiftDoc.days,
+              organizationId: shiftDoc.organizationId.toString(),
+              isDefault: false,
+            };
+          }
+        }
+
+        // If shiftId is null/undefined, or shift was not found/deleted, use default shift
+        if (!shift) {
+          shift = {
+            id: 'default',
+            name: DEFAULT_SHIFT.name,
+            startTime: DEFAULT_SHIFT.startTime,
+            endTime: DEFAULT_SHIFT.endTime,
+            lateTime: DEFAULT_SHIFT.lateTime,
+            days: DEFAULT_SHIFT.days,
+            organizationId: organizationId,
+            isDefault: true,
+          };
+        }
+
+        return {
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          mobileNumber: user.mobileNumber,
+          role: user.role,
+          status: user.status,
+          employeeId: user.employeeId,
+          remote: user.remote,
+          shiftId: user.shiftId ? user.shiftId.toString() : null,
+          shift: shift,
+          organizationId: user.organizationId.toString(),
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        };
+      }),
+    );
+
+    return usersWithShifts;
   }
 
   async getUserById(
@@ -288,6 +337,40 @@ export class UserService {
       throw new ForbiddenException('You can only view your own profile');
     }
 
+    // Fetch shift information
+    let shift: any = null;
+    
+    // If user has a shift assigned (not null/undefined), fetch it
+    if (user.shiftId) {
+      const shiftDoc = await this.shiftModel.findById(user.shiftId).lean();
+      if (shiftDoc) {
+        shift = {
+          id: shiftDoc._id.toString(),
+          name: shiftDoc.name,
+          startTime: shiftDoc.startTime,
+          endTime: shiftDoc.endTime,
+          lateTime: shiftDoc.lateTime,
+          days: shiftDoc.days,
+          organizationId: shiftDoc.organizationId.toString(),
+          isDefault: false,
+        };
+      }
+    }
+
+    // If shiftId is null/undefined, or shift was not found/deleted, use default shift
+    if (!shift) {
+      shift = {
+        id: 'default',
+        name: DEFAULT_SHIFT.name,
+        startTime: DEFAULT_SHIFT.startTime,
+        endTime: DEFAULT_SHIFT.endTime,
+        lateTime: DEFAULT_SHIFT.lateTime,
+        days: DEFAULT_SHIFT.days,
+        organizationId: organizationId,
+        isDefault: true,
+      };
+    }
+
     const userAny = user as any;
     return {
       id: user._id.toString(),
@@ -300,6 +383,7 @@ export class UserService {
       employeeId: user.employeeId,
       remote: user.remote,
       shiftId: user.shiftId ? user.shiftId.toString() : null,
+      shift: shift,
       organizationId: user.organizationId.toString(),
       createdAt: userAny.createdAt,
       updatedAt: userAny.updatedAt,

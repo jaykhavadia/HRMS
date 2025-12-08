@@ -66,7 +66,9 @@ export class AuthService {
     };
   }
 
-  async setupPassword(setupPasswordDto: SetupPasswordDto): Promise<{ message: string }> {
+  async setupPassword(
+    setupPasswordDto: SetupPasswordDto,
+  ): Promise<{ message: string }> {
     // Find user by token only - token uniquely identifies the user
     const user = await this.userModel.findOne({
       passwordSetupToken: setupPasswordDto.token,
@@ -77,7 +79,10 @@ export class AuthService {
     }
 
     // Check token expiry
-    if (user.passwordSetupTokenExpiry && user.passwordSetupTokenExpiry < new Date()) {
+    if (
+      user.passwordSetupTokenExpiry &&
+      user.passwordSetupTokenExpiry < new Date()
+    ) {
       throw new BadRequestException('Token has expired');
     }
 

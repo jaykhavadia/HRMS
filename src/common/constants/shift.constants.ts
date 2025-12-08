@@ -2,7 +2,7 @@
  * Default Shift Configuration
  * This is a global default shift that applies to all organizations
  * when a user doesn't have a custom shift assigned.
- * 
+ *
  * This shift cannot be modified, deleted, or updated.
  */
 export const DEFAULT_SHIFT = {
@@ -15,4 +15,3 @@ export const DEFAULT_SHIFT = {
   isDefault: true,
   organizationId: null, // Global shift, not tied to any organization
 };
-

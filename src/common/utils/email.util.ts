@@ -15,7 +15,7 @@ export function extractTenantDomainFromEmail(email: string): string {
   }
 
   const domain = parts[1].toLowerCase().trim(); // Get domain part (e.g., "acme-corp.com")
-  
+
   if (!domain) {
     throw new Error('Invalid email domain');
   }
@@ -30,7 +30,7 @@ export function extractTenantDomainFromEmail(email: string): string {
   // Remove the last part (TLD) and join the rest
   // This handles cases like: acme-corp.com, sub.company.co.uk
   const tenantDomain = domainParts.slice(0, -1).join('.');
-  
+
   return tenantDomain;
 }
 
@@ -72,4 +72,3 @@ export function getFullEmailDomain(email: string): string {
 
   return parts[1].toLowerCase().trim();
 }
-

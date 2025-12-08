@@ -150,7 +150,7 @@ export class AttendanceService {
     // Check if today is an off day
     const now = new Date();
     const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    
+
     if (shift.days[dayOfWeek] === 1) {
       throw new BadRequestException('Today is your weekly off day');
     }
@@ -329,7 +329,7 @@ export class AttendanceService {
     endDate?: Date,
   ): Promise<any[]> {
     const query: any = { organizationId };
-    
+
     if (userId) {
       query.userId = userId;
     }

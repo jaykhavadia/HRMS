@@ -18,4 +18,3 @@ import { CommonModule } from '../../common/common.module';
   exports: [GoogleOAuthService],
 })
 export class GoogleOAuthModule {}
-

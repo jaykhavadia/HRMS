@@ -17,4 +17,3 @@ import { User, UserSchema } from '../user/schemas/user.schema';
   exports: [ShiftService], // Export for use in AttendanceService
 })
 export class ShiftModule {}
-

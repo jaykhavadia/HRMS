@@ -48,8 +48,9 @@ export class GoogleOAuthCronService implements OnModuleInit {
     try {
       await this.handleTokenRefresh();
     } catch (error: any) {
-      this.logger.error(`Failed to refresh tokens on startup: ${error.message}`);
+      this.logger.error(
+        `Failed to refresh tokens on startup: ${error.message}`,
+      );
     }
   }
 }
-

@@ -33,10 +33,7 @@ export class UserController {
     @Body() createUserDto: CreateUserDto,
     @CurrentUser() user: any,
   ) {
-    return this.userService.createUser(
-      createUserDto,
-      user.organizationId,
-    );
+    return this.userService.createUser(createUserDto, user.organizationId);
   }
 
   @Post('bulk-upload')
@@ -60,10 +57,7 @@ export class UserController {
   }
 
   @Get(':id')
-  async getUserById(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-  ) {
+  async getUserById(@Param('id') id: string, @CurrentUser() user: any) {
     return this.userService.getUserById(
       id,
       user.organizationId,
@@ -80,21 +74,14 @@ export class UserController {
     @Body() updateUserDto: UpdateUserDto,
     @CurrentUser() user: any,
   ) {
-    return this.userService.updateUser(
-      id,
-      updateUserDto,
-      user.organizationId,
-    );
+    return this.userService.updateUser(id, updateUserDto, user.organizationId);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
-  async deleteUser(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-  ) {
+  async deleteUser(@Param('id') id: string, @CurrentUser() user: any) {
     return this.userService.deleteUser(id, user.organizationId);
   }
 }

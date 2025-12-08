@@ -49,8 +49,7 @@ Step 2 of registration. Stores data temporarily and sends OTP to email.
   "latitude": 40.7128,
   "radius": 100,
   "officeAddress": "123 Business St, New York, NY 10001",
-  "agreementAccepted": true,
-  "agreementVersion": "1.0"
+  "agreementAccepted": true
 }
 ```
 
@@ -106,7 +105,6 @@ Get company profile details.
   "weeklyOffDays": [0, 6],
   "agreementAccepted": true,
   "agreementAcceptedAt": "2025-01-01T00:00:00.000Z",
-  "agreementVersion": "1.0",
   "isActive": true,
   "createdAt": "...",
   "updatedAt": "..."

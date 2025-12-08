@@ -56,14 +56,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"companyName\": \"Acme Corporation\",\n  \"fullName\": \"John Doe\",\n  \"password\": \"SecurePassword123!\",\n  \"confirmPassword\": \"SecurePassword123!\",\n  \"longitude\": -74.0060,\n  \"latitude\": 40.7128,\n  \"radius\": 100,\n  \"officeAddress\": \"123 Business St, New York, NY 10001\",\n  \"agreementAccepted\": true,\n  \"agreementVersion\": \"1.0\"\n}"
+							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"companyName\": \"Acme Corporation\",\n  \"fullName\": \"John Doe\",\n  \"password\": \"SecurePassword123!\",\n  \"confirmPassword\": \"SecurePassword123!\",\n  \"longitude\": -74.0060,\n  \"latitude\": 40.7128,\n  \"radius\": 100,\n  \"officeAddress\": \"123 Business St, New York, NY 10001\",\n  \"agreementAccepted\": true\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/organization/register",
 							"host": ["{{base_url}}"],
 							"path": ["organization", "register"]
 						},
-						"description": "Step 2: Register organization. Stores data in temp table and sends OTP to email.\n\n**Fields:**\n- email: Admin email (must be unique)\n- companyName: Company name (must be unique)\n- fullName: Admin full name\n- password: Password (min 8 chars, must contain uppercase, lowercase, number)\n- confirmPassword: Must match password\n- longitude: Office longitude\n- latitude: Office latitude\n- radius: Office radius in meters\n- officeAddress: Office address\n- agreementAccepted: Boolean (required) - Registration agreement acceptance\n- agreementVersion: String (optional) - Version of agreement accepted\n\n**Response:** Returns message and email. Check email for OTP."
+						"description": "Step 2: Register organization. Stores data in temp table and sends OTP to email.\n\n**Fields:**\n- email: Admin email (must be unique)\n- companyName: Company name (must be unique)\n- fullName: Admin full name\n- password: Password (min 8 chars, must contain uppercase, lowercase, number)\n- confirmPassword: Must match password\n- longitude: Office longitude\n- latitude: Office latitude\n- radius: Office radius in meters\n- officeAddress: Office address\n- agreementAccepted: Boolean (required) - Registration agreement acceptance\n\n**Response:** Returns message and email. Check email for OTP."
 					},
 					"response": []
 				},

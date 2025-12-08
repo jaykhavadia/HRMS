@@ -8,19 +8,40 @@ async function bootstrap() {
   logger.log('=== Application Starting ===');
   logger.log(`Node Environment: ${process.env.NODE_ENV || 'not set'}`);
   logger.log(`PORT from env: ${process.env.PORT || 'not set'}`);
-  logger.log(`DB_URI from env: ${process.env.DB_URI ? '***SET***' : 'NOT SET'}`);
-  logger.log(`MASTER_DB_URI from env: ${process.env.MASTER_DB_URI ? '***SET***' : 'NOT SET'}`);
-  logger.log(`JWT_SECRET from env: ${process.env.JWT_SECRET ? '***SET***' : 'NOT SET'}`);
-  
+  logger.log(
+    `DB_URI from env: ${process.env.DB_URI ? '***SET***' : 'NOT SET'}`,
+  );
+  logger.log(
+    `MASTER_DB_URI from env: ${process.env.MASTER_DB_URI ? '***SET***' : 'NOT SET'}`,
+  );
+  logger.log(
+    `JWT_SECRET from env: ${process.env.JWT_SECRET ? '***SET***' : 'NOT SET'}`,
+  );
+
   // Log all relevant environment variables (masking sensitive ones)
-  const envVars = ['NODE_ENV', 'PORT', 'DB_URI', 'MASTER_DB_URI', 'JWT_SECRET', 'EMAIL_HOST', 'EMAIL_USER', 'FRONTEND_URL'];
+  const envVars = [
+    'NODE_ENV',
+    'PORT',
+    'DB_URI',
+    'MASTER_DB_URI',
+    'JWT_SECRET',
+    'EMAIL_HOST',
+    'EMAIL_USER',
+    'FRONTEND_URL',
+  ];
   logger.log('Environment Variables Summary:');
-  envVars.forEach(key => {
+  envVars.forEach((key) => {
     const value = process.env[key];
     if (value) {
       // Mask sensitive values
-      if (key.includes('SECRET') || key.includes('PASSWORD') || key.includes('URI')) {
-        logger.log(`  ${key}: ${value.substring(0, 20)}...${value.length > 20 ? '***' : ''}`);
+      if (
+        key.includes('SECRET') ||
+        key.includes('PASSWORD') ||
+        key.includes('URI')
+      ) {
+        logger.log(
+          `  ${key}: ${value.substring(0, 20)}...${value.length > 20 ? '***' : ''}`,
+        );
       } else {
         logger.log(`  ${key}: ${value}`);
       }

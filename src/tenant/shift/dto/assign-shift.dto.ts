@@ -9,4 +9,3 @@ export class AssignShiftDto {
   @IsString()
   shiftId: string;
 }
-

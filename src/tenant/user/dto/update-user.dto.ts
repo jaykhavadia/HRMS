@@ -33,4 +33,3 @@ export class UpdateUserDto {
 
   // Note: role cannot be updated - admin role is protected
 }
-

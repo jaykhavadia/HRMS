@@ -46,4 +46,3 @@ export class CreateShiftDto {
   days: number[]; // [Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday]
   // 0 = off day, 1 = working day
 }
-

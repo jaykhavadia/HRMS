@@ -51,7 +51,4 @@ export class RegisterDto {
 
   @IsNotEmpty()
   agreementAccepted: boolean; // Registration agreement acceptance
-
-  agreementVersion?: string; // Optional: version of agreement
 }
-

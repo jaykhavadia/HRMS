@@ -41,9 +41,6 @@ export class Organization {
   @Prop()
   agreementAcceptedAt?: Date;
 
-  @Prop()
-  agreementVersion?: string; // Version of agreement accepted
-
   @Prop({ default: Date.now })
   createdAt: Date;
 

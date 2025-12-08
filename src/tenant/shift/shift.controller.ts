@@ -32,10 +32,7 @@ export class ShiftController {
     @Body() createShiftDto: CreateShiftDto,
     @CurrentUser() user: any,
   ) {
-    return this.shiftService.createShift(
-      createShiftDto,
-      user.organizationId,
-    );
+    return this.shiftService.createShift(createShiftDto, user.organizationId);
   }
 
   @Get()
@@ -44,10 +41,7 @@ export class ShiftController {
   }
 
   @Get(':id')
-  async getShiftById(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-  ) {
+  async getShiftById(@Param('id') id: string, @CurrentUser() user: any) {
     return this.shiftService.getShiftById(id, user.organizationId);
   }
 
@@ -70,10 +64,7 @@ export class ShiftController {
   @UseGuards(RolesGuard)
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
-  async deleteShift(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-  ) {
+  async deleteShift(@Param('id') id: string, @CurrentUser() user: any) {
     return this.shiftService.deleteShift(id, user.organizationId);
   }
 
@@ -99,10 +90,6 @@ export class ShiftController {
     @Param('userId') userId: string,
     @CurrentUser() user: any,
   ) {
-    return this.shiftService.removeShiftFromUser(
-      userId,
-      user.organizationId,
-    );
+    return this.shiftService.removeShiftFromUser(userId, user.organizationId);
   }
 }
-

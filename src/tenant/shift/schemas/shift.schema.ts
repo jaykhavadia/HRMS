@@ -28,7 +28,11 @@ export class Shift {
   days: number[]; // [Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday]
   // 0 = off day, 1 = working day
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Organization',
+    required: true,
+  })
   organizationId: string; // Organization-specific shifts
 }
 
@@ -37,4 +41,3 @@ export const ShiftSchema = SchemaFactory.createForClass(Shift);
 // Index for organization queries
 ShiftSchema.index({ organizationId: 1 });
 ShiftSchema.index({ organizationId: 1, name: 1 }, { unique: true }); // Unique shift name per organization
-

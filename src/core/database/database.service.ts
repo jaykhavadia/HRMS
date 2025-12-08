@@ -16,24 +16,26 @@ export class DatabaseService implements OnModuleInit {
   onModuleInit() {
     // Master connection is already established via MongooseModule
     this.logger.log('=== DatabaseService Initialized ===');
-    this.logger.log(`Master connection state: ${this.masterConnection.readyState}`);
+    this.logger.log(
+      `Master connection state: ${this.masterConnection.readyState}`,
+    );
     this.logger.log(`Master connection name: ${this.masterConnection.name}`);
     this.logger.log(`Master connection host: ${this.masterConnection.host}`);
     this.logger.log(`Master connection port: ${this.masterConnection.port}`);
-    
+
     // Set up connection event listeners for debugging
     this.masterConnection.on('connected', () => {
       this.logger.log('✅ Master database connected successfully');
     });
-    
+
     this.masterConnection.on('error', (error) => {
       this.logger.error('❌ Master database connection error:', error.message);
     });
-    
+
     this.masterConnection.on('disconnected', () => {
       this.logger.warn('⚠️  Master database disconnected');
     });
-    
+
     this.masterConnection.on('reconnected', () => {
       this.logger.log('🔄 Master database reconnected');
     });
@@ -91,10 +93,15 @@ export class DatabaseService implements OnModuleInit {
     try {
       const connection = await createConnection(connectionUri).asPromise();
       this.tenantConnections.set(connectionKey, connection);
-      this.logger.log(`✅ Tenant connection created successfully: ${connectionKey}`);
+      this.logger.log(
+        `✅ Tenant connection created successfully: ${connectionKey}`,
+      );
       return connection;
     } catch (error) {
-      this.logger.error(`❌ Failed to create tenant connection: ${connectionKey}`, error.message);
+      this.logger.error(
+        `❌ Failed to create tenant connection: ${connectionKey}`,
+        error.message,
+      );
       throw error;
     }
   }

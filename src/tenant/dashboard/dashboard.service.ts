@@ -93,7 +93,10 @@ export class DashboardService {
     const recentActions = await this.attendanceModel
       .find({
         organizationId,
-        $or: [{ checkInTime: { $exists: true } }, { checkOutTime: { $exists: true } }],
+        $or: [
+          { checkInTime: { $exists: true } },
+          { checkOutTime: { $exists: true } },
+        ],
       })
       .populate('userId', 'firstName lastName email employeeId')
       .sort({ updatedAt: -1 })
