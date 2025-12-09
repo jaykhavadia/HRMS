@@ -36,61 +36,52 @@ export class EmailService implements OnModuleInit {
       );
     }
 
-    // Create transporter with Google SMTP settings
-    this.transporter = nodemailer.createTransport({
+    // Create transporter with proper TLS/SSL configuration
+    // Determine secure setting based on port if not explicitly set
+    const isSecurePort = emailConfig.port === 465;
+    const useSecure = emailConfig.secure !== undefined ? emailConfig.secure : isSecurePort;
+    
+    const transporterConfig: any = {
       host: emailConfig.host,
       port: emailConfig.port,
-      secure: emailConfig.secure, // true for 465, false for other ports
+      secure: useSecure, // true for 465 (SSL), false for 587 (STARTTLS)
       auth: {
         user: emailConfig.auth.user,
         pass: emailConfig.auth.pass,
       },
-      // Additional options for Gmail
-      ...(emailConfig.host.includes('gmail.com') && {
-        tls: {
-          // Do not fail on invalid certificates
-          rejectUnauthorized: false,
-        },
-      }),
-    });
+    };
 
-    // Verify connection on startup
-    this.verifyConnection();
-  }
-
-  /**
-   * Verify SMTP connection
-   */
-  private async verifyConnection() {
-    try {
-      await this.transporter.verify();
-      this.logger.log(
-        `✅ Email service connected successfully to ${this.configService.get('EMAIL_HOST') || 'smtp.gmail.com'}`,
-      );
-    } catch (error: any) {
-      this.logger.error('❌ Email service connection failed:', error.message);
-      if (error.message.includes('Invalid login')) {
-        this.logger.error(
-          '   This usually means:',
-        );
-        this.logger.error(
-          '   1. Wrong EMAIL_USER or EMAIL_PASSWORD',
-        );
-        this.logger.error(
-          '   2. For Gmail: You need an App Password, not your regular password',
-        );
-        this.logger.error(
-          '   3. 2-Factor Authentication must be enabled for Gmail',
-        );
-        this.logger.error(
-          '   See GOOGLE_SMTP_SETUP.md for detailed instructions',
-        );
-      }
-      // Don't throw - allow app to start but email sending will fail
-      this.logger.warn(
-        '⚠️  Email service will not work until configuration is fixed',
-      );
+    // Configure TLS based on port
+    if (emailConfig.port === 587) {
+      // Port 587 uses STARTTLS (not SSL)
+      transporterConfig.secure = false;
+      transporterConfig.requireTLS = true;
+      transporterConfig.tls = {
+        rejectUnauthorized: false,
+        // Use modern TLS
+        minVersion: 'TLSv1.2',
+      };
+      this.logger.debug('   Using STARTTLS (port 587)');
+    } else if (emailConfig.port === 465) {
+      // Port 465 uses SSL/TLS
+      transporterConfig.secure = true;
+      transporterConfig.tls = {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2',
+      };
+      this.logger.debug('   Using SSL/TLS (port 465)');
+    } else {
+      // Other ports - use TLS settings
+      transporterConfig.tls = {
+        rejectUnauthorized: false,
+      };
     }
+
+    this.logger.debug(`   Secure mode: ${transporterConfig.secure}`);
+    this.logger.debug(`   TLS required: ${transporterConfig.requireTLS || false}`);
+
+    this.transporter = nodemailer.createTransport(transporterConfig);
+
   }
 
   async onModuleInit() {
@@ -105,14 +96,34 @@ export class EmailService implements OnModuleInit {
       this.logger.log('🔄 Verifying SMTP connection...');
       await this.transporter.verify();
       this.isConnected = true;
-      this.logger.log(`✅ Email service connected successfully to ${this.configService.get('EMAIL_HOST') || 'smtp.gmail.com'}`);
+      this.logger.log(
+        `✅ Email service connected successfully to ${this.configService.get('EMAIL_HOST') || 'smtp.gmail.com'}`,
+      );
       this.logger.log('✅ Email service is ready to send emails');
     } catch (error: any) {
       this.isConnected = false;
       this.logger.error('❌ Email service connection failed!');
       this.logger.error(`   Error: ${error.message}`);
-      
-      if (error.code === 'EAUTH') {
+      this.logger.error(`   Error Code: ${error.code || 'N/A'}`);
+
+      // Handle specific SSL/TLS errors
+      if (
+        error.message?.includes('WRONG_VERSION_NUMBER') ||
+        error.message?.includes('EPROTO') ||
+        error.code === 'EPROTO'
+      ) {
+        this.logger.error('');
+        this.logger.error('🔍 SSL/TLS Configuration Error Detected!');
+        this.logger.error('   This usually means:');
+        this.logger.error('   1. Port/secure mismatch (587 should use secure=false, 465 should use secure=true)');
+        this.logger.error('   2. TLS negotiation failure');
+        this.logger.error('');
+        this.logger.error('   For Gmail:');
+        this.logger.error('   - Port 587: EMAIL_PORT=587, EMAIL_SECURE=false');
+        this.logger.error('   - Port 465: EMAIL_PORT=465, EMAIL_SECURE=true');
+        this.logger.error('');
+        this.logger.error('   Try switching to port 465 with secure=true if port 587 fails');
+      } else if (error.code === 'EAUTH') {
         this.logger.error('   Authentication failed - check EMAIL_USER and EMAIL_PASSWORD');
       } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
         this.logger.error('   Connection timeout - check EMAIL_HOST and EMAIL_PORT');
@@ -120,7 +131,7 @@ export class EmailService implements OnModuleInit {
       } else if (error.code === 'ENOTFOUND') {
         this.logger.error('   Host not found - check EMAIL_HOST is correct');
       }
-      
+
       this.logger.warn('⚠️  Email sending will fail until connection is fixed');
       // Don't throw - allow app to start but email sending will fail
     }

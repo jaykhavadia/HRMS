@@ -8,7 +8,6 @@ import {
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 import { ConfigService } from '../../config/config.service';
-import { GoogleOAuthService } from '../../master/google-oauth/google-oauth.service';
 
 @Injectable()
 export class GoogleDriveService implements OnModuleInit {
@@ -17,10 +16,11 @@ export class GoogleDriveService implements OnModuleInit {
   private readonly rootFolderName = 'HRMS';
   private auth: any;
   private useOAuth2: boolean = false;
+  private isInitialized: boolean = false;
 
   constructor(
     private configService: ConfigService,
-    @Optional() private googleOAuthService?: GoogleOAuthService,
+    @Optional() private googleOAuthService?: any, // Use 'any' to avoid import issues
   ) {
     // Don't initialize here - wait for OnModuleInit to ensure OAuth service is ready
   }
@@ -31,6 +31,8 @@ export class GoogleDriveService implements OnModuleInit {
 
   private async initializeDrive() {
     try {
+      this.logger.log('🔄 Initializing Google Drive service...');
+      
       // Option 1: Try OAuth2 from database (highest priority)
       if (this.googleOAuthService) {
         try {
@@ -39,13 +41,14 @@ export class GoogleDriveService implements OnModuleInit {
           this.auth = oauth2Client;
           this.drive = google.drive({ version: 'v3', auth: this.auth });
           this.useOAuth2 = true;
+          this.isInitialized = true;
           this.logger.log(
-            'Google Drive initialized using OAuth2 from database',
+            '✅ Google Drive initialized using OAuth2 from database',
           );
           return;
         } catch (error: any) {
           this.logger.warn(
-            `OAuth2 from database failed: ${error.message}, falling back to service account`,
+            `⚠️  OAuth2 from database failed: ${error.message}, falling back to service account`,
           );
         }
       }
@@ -64,8 +67,9 @@ export class GoogleDriveService implements OnModuleInit {
           ],
         });
         this.drive = google.drive({ version: 'v3', auth: this.auth });
+        this.isInitialized = true;
         this.logger.log(
-          'Google Drive initialized using service account JSON file',
+          '✅ Google Drive initialized using service account JSON file',
         );
         return;
       }
@@ -88,18 +92,37 @@ export class GoogleDriveService implements OnModuleInit {
           ],
         });
         this.drive = google.drive({ version: 'v3', auth: this.auth });
+        this.isInitialized = true;
         this.logger.log(
-          'Google Drive initialized using service account from env',
+          '✅ Google Drive initialized using service account from env',
         );
         return;
       }
 
-      throw new InternalServerErrorException(
-        'Google Drive credentials not configured. Please set OAuth2 credentials in database or GOOGLE_DRIVE_SERVICE_ACCOUNT_PATH or GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL and GOOGLE_DRIVE_PRIVATE_KEY',
-      );
+      // No credentials found - log warning but don't throw error
+      this.isInitialized = false;
+      this.logger.warn('⚠️  Google Drive service not initialized - credentials not configured');
+      this.logger.warn('   Google Drive features will be disabled');
+      this.logger.warn('   To enable Google Drive, configure one of:');
+      this.logger.warn('   1. OAuth2 credentials in database (via GoogleOAuthModule)');
+      this.logger.warn('   2. GOOGLE_DRIVE_SERVICE_ACCOUNT_PATH (path to JSON file)');
+      this.logger.warn('   3. GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL + GOOGLE_DRIVE_PRIVATE_KEY');
     } catch (error: any) {
+      this.isInitialized = false;
+      this.logger.error('❌ Failed to initialize Google Drive service');
+      this.logger.error(`   Error: ${error.message}`);
+      this.logger.warn('⚠️  Google Drive features will be disabled');
+      // Don't throw - allow app to start without Google Drive
+    }
+  }
+
+  /**
+   * Check if Google Drive is initialized
+   */
+  private checkInitialized(): void {
+    if (!this.isInitialized || !this.drive) {
       throw new InternalServerErrorException(
-        `Failed to initialize Google Drive: ${error.message}`,
+        'Google Drive service is not initialized. Please configure Google Drive credentials.',
       );
     }
   }
@@ -128,6 +151,7 @@ export class GoogleDriveService implements OnModuleInit {
     folderName: string,
     parentFolderId?: string,
   ): Promise<string> {
+    this.checkInitialized();
     try {
       // Search for existing folder
       let query = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
@@ -194,6 +218,7 @@ export class GoogleDriveService implements OnModuleInit {
     currentDate: string, // Format: YYYY-MM-DD
     employeeName: string,
   ): Promise<string> {
+    this.checkInitialized();
     // Ensure we have a valid auth token (refresh if needed for OAuth2)
     await this.ensureValidAuth();
 
@@ -270,6 +295,7 @@ export class GoogleDriveService implements OnModuleInit {
    * Delete file from Google Drive by URL or file ID
    */
   async deleteFile(fileUrlOrId: string): Promise<void> {
+    this.checkInitialized();
     try {
       // Extract file ID from URL if it's a URL
       let fileId = fileUrlOrId;
