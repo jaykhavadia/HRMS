@@ -81,26 +81,29 @@ Token expiration time.
 
 ### Email Configuration (Nodemailer)
 
-#### Gmail Setup (Recommended)
+#### Gmail Setup (Recommended) - Google SMTP
 
-1. **Enable 2-Factor Authentication:**
-   - Go to https://myaccount.google.com/security
-   - Enable 2-Step Verification
+**📖 For detailed step-by-step instructions, see [GOOGLE_SMTP_SETUP.md](./GOOGLE_SMTP_SETUP.md)**
 
-2. **Generate App Password:**
-   - Go to https://myaccount.google.com/apppasswords
-   - Select "Mail" and "Other (Custom name)"
-   - Enter "HRMS" as the name
-   - Copy the 16-character password
+**Quick Setup:**
 
+1. **Enable 2-Factor Authentication** on your Google account
+2. **Generate App Password** from https://myaccount.google.com/apppasswords
 3. **Configure in .env:**
-   ```
-   EMAIL_HOST=smtp.gmail.com
-   EMAIL_PORT=587
-   EMAIL_SECURE=false
-   EMAIL_USER=your-email@gmail.com
-   EMAIL_PASSWORD=xxxx xxxx xxxx xxxx
-   ```
+
+```env
+# Google SMTP Configuration (Required)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=xxxx xxxx xxxx xxxx
+```
+
+**⚠️ Important Notes:**
+- You MUST use an **App Password** (16-character code), NOT your regular Gmail password
+- 2-Factor Authentication MUST be enabled on your Google account
+- See [GOOGLE_SMTP_SETUP.md](./GOOGLE_SMTP_SETUP.md) for complete instructions and troubleshooting
 
 #### Other Email Providers
 

@@ -86,13 +86,30 @@ export class ConfigService implements OnModuleInit {
   }
 
   getEmailConfig() {
+    // Default to Google SMTP (Gmail)
+    const host = this.get('EMAIL_HOST') || 'smtp.gmail.com';
+    const port = parseInt(this.get('EMAIL_PORT') || '587');
+    const secure = this.get('EMAIL_SECURE') === 'true';
+    const user = this.get('EMAIL_USER');
+    const password = this.get('EMAIL_PASSWORD');
+
+    // Validate required fields for Google SMTP
+    if (host.includes('gmail.com') && (!user || !password)) {
+      this.logger.warn(
+        '⚠️  Gmail SMTP requires EMAIL_USER and EMAIL_PASSWORD (App Password)',
+      );
+      this.logger.warn(
+        '⚠️  See GOOGLE_SMTP_SETUP.md for instructions on getting Gmail App Password',
+      );
+    }
+
     return {
-      host: this.get('EMAIL_HOST') || 'smtp.gmail.com',
-      port: parseInt(this.get('EMAIL_PORT') || '587'),
-      secure: this.get('EMAIL_SECURE') === 'true',
+      host,
+      port,
+      secure,
       auth: {
-        user: this.get('EMAIL_USER'),
-        pass: this.get('EMAIL_PASSWORD'),
+        user,
+        pass: password,
       },
     };
   }

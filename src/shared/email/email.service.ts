@@ -18,12 +18,79 @@ export class EmailService implements OnModuleInit {
     this.logger.log(`SMTP User: ${emailConfig.auth.user || 'NOT SET'}`);
     this.logger.log(`SMTP Password: ${emailConfig.auth.pass ? '***SET***' : 'NOT SET'}`);
 
+    // Validate email configuration
+    if (!emailConfig.auth.user || !emailConfig.auth.pass) {
+      this.logger.error(
+        '❌ Email configuration incomplete: EMAIL_USER and EMAIL_PASSWORD are required',
+      );
+      if (emailConfig.host.includes('gmail.com')) {
+        this.logger.error(
+          '   For Gmail, you need an App Password (not your regular password)',
+        );
+        this.logger.error(
+          '   See GOOGLE_SMTP_SETUP.md for setup instructions',
+        );
+      }
+      throw new Error(
+        'Email configuration incomplete. Please set EMAIL_USER and EMAIL_PASSWORD in .env file',
+      );
+    }
+
+    // Create transporter with Google SMTP settings
     this.transporter = nodemailer.createTransport({
       host: emailConfig.host,
       port: emailConfig.port,
-      secure: emailConfig.secure,
-      auth: emailConfig.auth,
+      secure: emailConfig.secure, // true for 465, false for other ports
+      auth: {
+        user: emailConfig.auth.user,
+        pass: emailConfig.auth.pass,
+      },
+      // Additional options for Gmail
+      ...(emailConfig.host.includes('gmail.com') && {
+        tls: {
+          // Do not fail on invalid certificates
+          rejectUnauthorized: false,
+        },
+      }),
     });
+
+    // Verify connection on startup
+    this.verifyConnection();
+  }
+
+  /**
+   * Verify SMTP connection
+   */
+  private async verifyConnection() {
+    try {
+      await this.transporter.verify();
+      this.logger.log(
+        `✅ Email service connected successfully to ${this.configService.get('EMAIL_HOST') || 'smtp.gmail.com'}`,
+      );
+    } catch (error: any) {
+      this.logger.error('❌ Email service connection failed:', error.message);
+      if (error.message.includes('Invalid login')) {
+        this.logger.error(
+          '   This usually means:',
+        );
+        this.logger.error(
+          '   1. Wrong EMAIL_USER or EMAIL_PASSWORD',
+        );
+        this.logger.error(
+          '   2. For Gmail: You need an App Password, not your regular password',
+        );
+        this.logger.error(
+          '   3. 2-Factor Authentication must be enabled for Gmail',
+        );
+        this.logger.error(
+          '   See GOOGLE_SMTP_SETUP.md for detailed instructions',
+        );
+      }
+      // Don't throw - allow app to start but email sending will fail
+      this.logger.warn(
+        '⚠️  Email service will not work until configuration is fixed',
+      );
+    }
   }
 
   async onModuleInit() {
