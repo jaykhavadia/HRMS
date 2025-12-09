@@ -1,14 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { ConfigService } from '../../config/config.service';
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnModuleInit {
   private transporter: nodemailer.Transporter;
   private readonly logger = new Logger(EmailService.name);
+  private isConnected: boolean = false;
 
   constructor(private configService: ConfigService) {
     const emailConfig = this.configService.getEmailConfig();
+    
+    this.logger.log('=== Email Service Initialization ===');
+    this.logger.log(`SMTP Host: ${emailConfig.host}`);
+    this.logger.log(`SMTP Port: ${emailConfig.port}`);
+    this.logger.log(`SMTP Secure: ${emailConfig.secure}`);
+    this.logger.log(`SMTP User: ${emailConfig.auth.user || 'NOT SET'}`);
+    this.logger.log(`SMTP Password: ${emailConfig.auth.pass ? '***SET***' : 'NOT SET'}`);
+
     this.transporter = nodemailer.createTransport({
       host: emailConfig.host,
       port: emailConfig.port,
@@ -17,11 +26,48 @@ export class EmailService {
     });
   }
 
+  async onModuleInit() {
+    await this.verifyConnection();
+  }
+
+  /**
+   * Verify SMTP connection on startup
+   */
+  private async verifyConnection() {
+    try {
+      this.logger.log('🔄 Verifying SMTP connection...');
+      await this.transporter.verify();
+      this.isConnected = true;
+      this.logger.log(`✅ Email service connected successfully to ${this.configService.get('EMAIL_HOST') || 'smtp.gmail.com'}`);
+      this.logger.log('✅ Email service is ready to send emails');
+    } catch (error: any) {
+      this.isConnected = false;
+      this.logger.error('❌ Email service connection failed!');
+      this.logger.error(`   Error: ${error.message}`);
+      
+      if (error.code === 'EAUTH') {
+        this.logger.error('   Authentication failed - check EMAIL_USER and EMAIL_PASSWORD');
+      } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
+        this.logger.error('   Connection timeout - check EMAIL_HOST and EMAIL_PORT');
+        this.logger.error('   Ensure firewall allows outbound connections on port 587');
+      } else if (error.code === 'ENOTFOUND') {
+        this.logger.error('   Host not found - check EMAIL_HOST is correct');
+      }
+      
+      this.logger.warn('⚠️  Email sending will fail until connection is fixed');
+      // Don't throw - allow app to start but email sending will fail
+    }
+  }
+
   async sendWelcomeEmail(
     to: string,
     companyName: string,
     displayName: string,
   ): Promise<void> {
+    if (!this.isConnected) {
+      this.logger.warn(`⚠️  Attempting to send welcome email but SMTP connection is not verified`);
+    }
+
     const mailOptions = {
       from: this.configService.get('EMAIL_USER'),
       to,
@@ -44,11 +90,27 @@ export class EmailService {
       `,
     };
 
+    this.logger.log(`📧 Attempting to send welcome email to: ${to}`);
+    this.logger.debug(`   Subject: Welcome to HRMS - ${displayName}`);
+    this.logger.debug(`   From: ${mailOptions.from}`);
+
     try {
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Welcome email sent to ${to}`);
-    } catch (error) {
-      this.logger.error(`Failed to send welcome email to ${to}:`, error);
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`✅ Welcome email sent successfully to ${to}`);
+      this.logger.debug(`   Message ID: ${info.messageId}`);
+      if (info.response) {
+        this.logger.debug(`   Server Response: ${info.response}`);
+      }
+    } catch (error: any) {
+      this.logger.error(`❌ Failed to send welcome email to ${to}`);
+      this.logger.error(`   Error: ${error.message}`);
+      this.logger.error(`   Error Code: ${error.code || 'N/A'}`);
+      if (error.response) {
+        this.logger.error(`   Server Response: ${error.response}`);
+      }
+      if (error.responseCode) {
+        this.logger.error(`   Response Code: ${error.responseCode}`);
+      }
       throw error;
     }
   }
@@ -58,6 +120,10 @@ export class EmailService {
     firstName: string,
     setupUrl: string,
   ): Promise<void> {
+    if (!this.isConnected) {
+      this.logger.warn(`⚠️  Attempting to send password setup email but SMTP connection is not verified`);
+    }
+
     const mailOptions = {
       from: this.configService.get('EMAIL_USER'),
       to,
@@ -81,11 +147,28 @@ export class EmailService {
       `,
     };
 
+    this.logger.log(`📧 Attempting to send password setup email to: ${to}`);
+    this.logger.debug(`   Subject: Set Up Your HRMS Account Password`);
+    this.logger.debug(`   From: ${mailOptions.from}`);
+    this.logger.debug(`   Recipient: ${firstName} (${to})`);
+
     try {
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Password setup email sent to ${to}`);
-    } catch (error) {
-      this.logger.error(`Failed to send password setup email to ${to}:`, error);
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`✅ Password setup email sent successfully to ${to}`);
+      this.logger.debug(`   Message ID: ${info.messageId}`);
+      if (info.response) {
+        this.logger.debug(`   Server Response: ${info.response}`);
+      }
+    } catch (error: any) {
+      this.logger.error(`❌ Failed to send password setup email to ${to}`);
+      this.logger.error(`   Error: ${error.message}`);
+      this.logger.error(`   Error Code: ${error.code || 'N/A'}`);
+      if (error.response) {
+        this.logger.error(`   Server Response: ${error.response}`);
+      }
+      if (error.responseCode) {
+        this.logger.error(`   Response Code: ${error.responseCode}`);
+      }
       throw error;
     }
   }
@@ -95,6 +178,10 @@ export class EmailService {
     otp: string,
     companyName: string,
   ): Promise<void> {
+    if (!this.isConnected) {
+      this.logger.warn(`⚠️  Attempting to send OTP email but SMTP connection is not verified`);
+    }
+
     const mailOptions = {
       from: this.configService.get('EMAIL_USER'),
       to,
@@ -117,11 +204,29 @@ export class EmailService {
       `,
     };
 
+    this.logger.log(`📧 Attempting to send OTP email to: ${to}`);
+    this.logger.debug(`   Subject: HRMS Registration - OTP Verification`);
+    this.logger.debug(`   From: ${mailOptions.from}`);
+    this.logger.debug(`   Company: ${companyName}`);
+    this.logger.debug(`   OTP: ${otp}`);
+
     try {
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`OTP email sent to ${to}`);
-    } catch (error) {
-      this.logger.error(`Failed to send OTP email to ${to}:`, error);
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`✅ OTP email sent successfully to ${to}`);
+      this.logger.debug(`   Message ID: ${info.messageId}`);
+      if (info.response) {
+        this.logger.debug(`   Server Response: ${info.response}`);
+      }
+    } catch (error: any) {
+      this.logger.error(`❌ Failed to send OTP email to ${to}`);
+      this.logger.error(`   Error: ${error.message}`);
+      this.logger.error(`   Error Code: ${error.code || 'N/A'}`);
+      if (error.response) {
+        this.logger.error(`   Server Response: ${error.response}`);
+      }
+      if (error.responseCode) {
+        this.logger.error(`   Response Code: ${error.responseCode}`);
+      }
       throw error;
     }
   }
