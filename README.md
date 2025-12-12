@@ -759,6 +759,27 @@ When an admin creates your account, you'll receive an email with a password setu
 
 ---
 
+## 🚀 Deploy to Render
+
+Your HRMS application can be deployed to Render using either approach. See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) for detailed instructions.
+
+### Quick Render Setup:
+
+#### Option A: Render Docker Service (Recommended)
+1. Change service type to "Docker" in Render dashboard
+2. Set **Dockerfile Path**: `render.Dockerfile`
+3. Add environment variables for MongoDB Atlas
+4. Deploy!
+
+#### Option B: Render Node.js Service
+1. Keep as "Node" service type
+2. Set **Build Command**: `npm run render-build`
+3. Set **Start Command**: `npm run render-start`
+4. Add environment variables
+5. Deploy!
+
+---
+
 ## Support
 
 If you encounter any issues not covered here:
