@@ -1,10 +1,25 @@
 {
-  "name": "HRMS",
-  "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "name": "hrms",
+  "version": "1.0.0",
+  "description": "Human Resource Management System - A comprehensive HRMS platform for managing employees, attendance tracking, and organizational workflows",
+  "author": "HRMS Team",
   "private": true,
   "license": "UNLICENSED",
+  "keywords": ["hrms", "hr", "human-resources", "attendance", "nestjs", "mongodb"],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/hrms.git"
+  },
+  "homepage": "https://github.com/your-org/hrms#readme",
+  "bugs": {
+    "url": "https://github.com/your-org/hrms/issues"
+  },
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -13,11 +28,35 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:restart": "docker-compose restart",
+    "docker:clean": "docker-compose down -v --remove-orphans && docker system prune -f",
+    "docker:dev": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
+    "docker:prod": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d",
+    "docker:init": "./docker-init.sh",
+    "docker:status": "docker-compose ps",
+    "docker:shell": "docker-compose exec hrms-app sh",
+    "docker:mongo": "docker-compose exec mongodb mongo -u admin -p admin123",
+    "docker:mongo:express": "docker-compose --profile tools up mongo-express",
+    "dev": "npm run start:dev",
+    "dev:docker": "npm run docker:dev",
+    "prod": "npm run docker:prod",
+    "db:migrate": "echo 'No migrations needed - MongoDB handles schema updates automatically'",
+    "db:seed": "echo 'Database seeding not implemented yet'",
+    "db:reset": "docker-compose exec mongodb mongo -u admin -p admin123 hrms --eval 'db.dropDatabase()'",
+    "db:backup": "docker-compose exec mongodb mongodump -u admin -p admin123 --db hrms --out /backup && echo 'Backup created in ./docker/volumes/mongodb/backup/'",
+    "db:restore": "docker-compose exec mongodb mongorestore -u admin -p admin123 --db hrms /backup/hrms",
+    "clean": "rm -rf dist node_modules/.cache coverage",
+    "clean:all": "npm run clean && docker-compose down -v --remove-orphans && docker system prune -f"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -88,6 +127,24 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapping": {
+      "^@/(.*)$": "<rootDir>/$1"
+    },
+    "testTimeout": 10000,
+    "setupFilesAfterEnv": ["<rootDir>/../test/setup.ts"],
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    }
   }
 }

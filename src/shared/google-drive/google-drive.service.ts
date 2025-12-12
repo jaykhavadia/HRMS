@@ -32,7 +32,7 @@ export class GoogleDriveService implements OnModuleInit {
   private async initializeDrive() {
     try {
       this.logger.log('🔄 Initializing Google Drive service...');
-      
+
       // Option 1: Try OAuth2 from database (highest priority)
       if (this.googleOAuthService) {
         try {
@@ -101,12 +101,20 @@ export class GoogleDriveService implements OnModuleInit {
 
       // No credentials found - log warning but don't throw error
       this.isInitialized = false;
-      this.logger.warn('⚠️  Google Drive service not initialized - credentials not configured');
+      this.logger.warn(
+        '⚠️  Google Drive service not initialized - credentials not configured',
+      );
       this.logger.warn('   Google Drive features will be disabled');
       this.logger.warn('   To enable Google Drive, configure one of:');
-      this.logger.warn('   1. OAuth2 credentials in database (via GoogleOAuthModule)');
-      this.logger.warn('   2. GOOGLE_DRIVE_SERVICE_ACCOUNT_PATH (path to JSON file)');
-      this.logger.warn('   3. GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL + GOOGLE_DRIVE_PRIVATE_KEY');
+      this.logger.warn(
+        '   1. OAuth2 credentials in database (via GoogleOAuthModule)',
+      );
+      this.logger.warn(
+        '   2. GOOGLE_DRIVE_SERVICE_ACCOUNT_PATH (path to JSON file)',
+      );
+      this.logger.warn(
+        '   3. GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL + GOOGLE_DRIVE_PRIVATE_KEY',
+      );
     } catch (error: any) {
       this.isInitialized = false;
       this.logger.error('❌ Failed to initialize Google Drive service');

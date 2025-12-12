@@ -291,20 +291,20 @@ export class UserService {
         }
 
         return {
-      id: user._id.toString(),
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      mobileNumber: user.mobileNumber,
-      role: user.role,
-      status: user.status,
-      employeeId: user.employeeId,
-      remote: user.remote,
-      shiftId: user.shiftId ? user.shiftId.toString() : null,
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          mobileNumber: user.mobileNumber,
+          role: user.role,
+          status: user.status,
+          employeeId: user.employeeId,
+          remote: user.remote,
+          shiftId: user.shiftId ? user.shiftId.toString() : null,
           shift: shift,
-      organizationId: user.organizationId.toString(),
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+          organizationId: user.organizationId.toString(),
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
         };
       }),
     );
@@ -339,7 +339,7 @@ export class UserService {
 
     // Fetch shift information
     let shift: any = null;
-    
+
     // If user has a shift assigned (not null/undefined), fetch it
     if (user.shiftId) {
       const shiftDoc = await this.shiftModel.findById(user.shiftId).lean();

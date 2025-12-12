@@ -10,37 +10,44 @@ export class EmailService implements OnModuleInit {
 
   constructor(private configService: ConfigService) {
     const emailConfig = this.configService.getEmailConfig();
-    
+
     this.logger.log('=== Email Service Initialization ===');
     this.logger.log(`SMTP Host: ${emailConfig.host}`);
     this.logger.log(`SMTP Port: ${emailConfig.port}`);
     this.logger.log(`SMTP Secure: ${emailConfig.secure}`);
     this.logger.log(`SMTP User: ${emailConfig.auth.user || 'NOT SET'}`);
-    this.logger.log(`SMTP Password: ${emailConfig.auth.pass ? '***SET***' : 'NOT SET'}`);
+    this.logger.log(
+      `SMTP Password: ${emailConfig.auth.pass ? '***SET***' : 'NOT SET'}`,
+    );
 
-    // Validate email configuration
+    // Validate email configuration (optional for Docker/testing)
     if (!emailConfig.auth.user || !emailConfig.auth.pass) {
-      this.logger.error(
-        '❌ Email configuration incomplete: EMAIL_USER and EMAIL_PASSWORD are required',
+      this.logger.warn(
+        '⚠️  Email configuration incomplete: EMAIL_USER and EMAIL_PASSWORD are not set',
+      );
+      this.logger.warn(
+        '   Email features will be disabled until proper credentials are configured',
       );
       if (emailConfig.host.includes('gmail.com')) {
-        this.logger.error(
+        this.logger.warn(
           '   For Gmail, you need an App Password (not your regular password)',
         );
-        this.logger.error(
-          '   See GOOGLE_SMTP_SETUP.md for setup instructions',
-        );
+        this.logger.warn('   See GOOGLE_SMTP_SETUP.md for setup instructions');
       }
-      throw new Error(
-        'Email configuration incomplete. Please set EMAIL_USER and EMAIL_PASSWORD in .env file',
+      this.logger.warn(
+        '   To enable email features, set EMAIL_USER and EMAIL_PASSWORD in your environment',
       );
+      // Don't throw error - allow app to start without email
+      this.isConnected = false;
+      return;
     }
 
     // Create transporter with proper TLS/SSL configuration
     // Determine secure setting based on port if not explicitly set
     const isSecurePort = emailConfig.port === 465;
-    const useSecure = emailConfig.secure !== undefined ? emailConfig.secure : isSecurePort;
-    
+    const useSecure =
+      emailConfig.secure !== undefined ? emailConfig.secure : isSecurePort;
+
     const transporterConfig: any = {
       host: emailConfig.host,
       port: emailConfig.port,
@@ -78,10 +85,11 @@ export class EmailService implements OnModuleInit {
     }
 
     this.logger.debug(`   Secure mode: ${transporterConfig.secure}`);
-    this.logger.debug(`   TLS required: ${transporterConfig.requireTLS || false}`);
+    this.logger.debug(
+      `   TLS required: ${transporterConfig.requireTLS || false}`,
+    );
 
     this.transporter = nodemailer.createTransport(transporterConfig);
-
   }
 
   async onModuleInit() {
@@ -115,19 +123,29 @@ export class EmailService implements OnModuleInit {
         this.logger.error('');
         this.logger.error('🔍 SSL/TLS Configuration Error Detected!');
         this.logger.error('   This usually means:');
-        this.logger.error('   1. Port/secure mismatch (587 should use secure=false, 465 should use secure=true)');
+        this.logger.error(
+          '   1. Port/secure mismatch (587 should use secure=false, 465 should use secure=true)',
+        );
         this.logger.error('   2. TLS negotiation failure');
         this.logger.error('');
         this.logger.error('   For Gmail:');
         this.logger.error('   - Port 587: EMAIL_PORT=587, EMAIL_SECURE=false');
         this.logger.error('   - Port 465: EMAIL_PORT=465, EMAIL_SECURE=true');
         this.logger.error('');
-        this.logger.error('   Try switching to port 465 with secure=true if port 587 fails');
+        this.logger.error(
+          '   Try switching to port 465 with secure=true if port 587 fails',
+        );
       } else if (error.code === 'EAUTH') {
-        this.logger.error('   Authentication failed - check EMAIL_USER and EMAIL_PASSWORD');
+        this.logger.error(
+          '   Authentication failed - check EMAIL_USER and EMAIL_PASSWORD',
+        );
       } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
-        this.logger.error('   Connection timeout - check EMAIL_HOST and EMAIL_PORT');
-        this.logger.error('   Ensure firewall allows outbound connections on port 587');
+        this.logger.error(
+          '   Connection timeout - check EMAIL_HOST and EMAIL_PORT',
+        );
+        this.logger.error(
+          '   Ensure firewall allows outbound connections on port 587',
+        );
       } else if (error.code === 'ENOTFOUND') {
         this.logger.error('   Host not found - check EMAIL_HOST is correct');
       }
@@ -143,7 +161,9 @@ export class EmailService implements OnModuleInit {
     displayName: string,
   ): Promise<void> {
     if (!this.isConnected) {
-      this.logger.warn(`⚠️  Attempting to send welcome email but SMTP connection is not verified`);
+      this.logger.warn(
+        `⚠️  Attempting to send welcome email but SMTP connection is not verified`,
+      );
     }
 
     const mailOptions = {
@@ -199,7 +219,9 @@ export class EmailService implements OnModuleInit {
     setupUrl: string,
   ): Promise<void> {
     if (!this.isConnected) {
-      this.logger.warn(`⚠️  Attempting to send password setup email but SMTP connection is not verified`);
+      this.logger.warn(
+        `⚠️  Attempting to send password setup email but SMTP connection is not verified`,
+      );
     }
 
     const mailOptions = {
@@ -257,7 +279,9 @@ export class EmailService implements OnModuleInit {
     companyName: string,
   ): Promise<void> {
     if (!this.isConnected) {
-      this.logger.warn(`⚠️  Attempting to send OTP email but SMTP connection is not verified`);
+      this.logger.warn(
+        `⚠️  Attempting to send OTP email but SMTP connection is not verified`,
+      );
     }
 
     const mailOptions = {

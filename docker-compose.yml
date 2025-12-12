@@ -1,0 +1,100 @@
+services:
+  # MongoDB Database with persistent volume
+  mongodb:
+    image: mongo:7.0
+    container_name: hrms_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: hrms
+    ports:
+      - "27018:27017"
+    volumes:
+      # Persistent data volume - data will persist even if container is removed
+      - mongodb_data:/data/db
+      # Optional: Initialize database with scripts (if needed)
+      - ./docker/mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - hrms_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    command: --bind_ip_all --logpath /dev/null
+
+  # Optional: MongoDB Express (Web UI for MongoDB)
+  mongo-express:
+    image: mongo-express:1.0
+    container_name: hrms_mongo_express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin123
+      ME_CONFIG_MONGODB_URL: mongodb://admin:admin123@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: pass123
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - hrms_network
+    profiles:
+      - tools  # Optional: run with `docker-compose --profile tools up`
+
+  # HRMS Application
+  hrms-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hrms_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_URI=mongodb://admin:admin123@mongodb:27017/hrms?authSource=admin
+      - MASTER_DB_URI=mongodb://admin:admin123@mongodb:27017/hrms?authSource=admin
+      # Email configuration (update these in your .env file)
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_SECURE=false
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      # JWT and other configs
+      - JWT_SECRET=${JWT_SECRET:-your-docker-jwt-secret-change-in-production}
+      - JWT_EXPIRATION=24h
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - OFFICE_LOCATION_RADIUS=100
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      # Mount uploads directory for file persistence
+      - ./uploads:/app/uploads
+      # Optional: Mount logs directory
+      - ./logs:/app/logs
+    networks:
+      - hrms_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mongodb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./docker/volumes/mongodb
+
+networks:
+  hrms_network:
+    driver: bridge

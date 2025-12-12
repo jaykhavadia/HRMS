@@ -10,6 +10,215 @@
 
 ---
 
+## 🚀 Docker Setup (Recommended for Production)
+
+### Why Docker?
+
+Docker provides:
+- ✅ **Faster Performance**: Local MongoDB is much faster than MongoDB Atlas
+- ✅ **Data Persistence**: Your data won't disappear when containers restart
+- ✅ **Easy Deployment**: Simple commands to start/stop the entire system
+- ✅ **Isolation**: Database and app run in separate containers
+- ✅ **Development**: Same environment for development and production
+
+### Quick Start with Docker
+
+#### Prerequisites
+- Docker and Docker Compose installed on your system
+
+#### Step 1: Set up Environment Variables
+
+```bash
+# Copy the Docker environment template
+cp docker/.env.docker.example .env
+
+# Edit the .env file with your settings
+nano .env
+```
+
+**Required settings in `.env`:**
+```bash
+# Database (already configured for Docker)
+DB_URI=mongodb://admin:admin123@mongodb:27017/hrms
+MASTER_DB_URI=mongodb://admin:admin123@mongodb:27017/hrms
+
+# JWT Secret (generate a strong random key)
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+
+# Email Configuration (required for registration)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-gmail-app-password
+
+# Frontend URL
+FRONTEND_URL=http://localhost:3000
+```
+
+#### Step 2: Start the Application
+
+```bash
+# Start all services (MongoDB + HRMS App)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Check if services are running
+docker-compose ps
+```
+
+#### Step 3: Access Your Application
+
+- **HRMS Application**: http://localhost:3000
+- **MongoDB Admin UI** (optional): http://localhost:8081
+  - Username: `admin`
+  - Password: `pass123`
+
+#### Step 4: Stop the Application
+
+```bash
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (⚠️ This will delete your data!)
+docker-compose down -v
+```
+
+### Docker Commands Reference
+
+```bash
+# Start services
+docker-compose up -d
+
+# Stop services
+docker-compose down
+
+# View logs
+docker-compose logs -f
+
+# View logs for specific service
+docker-compose logs -f hrms-app
+docker-compose logs -f mongodb
+
+# Restart services
+docker-compose restart
+
+# Rebuild and restart (after code changes)
+docker-compose up -d --build
+
+# Access MongoDB container
+docker-compose exec mongodb mongo -u admin -p admin123
+
+# Access app container
+docker-compose exec hrms-app sh
+
+# View resource usage
+docker-compose stats
+```
+
+### NPM Scripts for Docker
+
+We've also added convenient npm scripts for Docker management:
+
+```bash
+# Quick setup and management
+npm run docker:init      # Run automated Docker setup
+npm run docker:build     # Build Docker images
+npm run docker:up        # Start all services
+npm run docker:down      # Stop all services
+npm run docker:logs      # View logs
+npm run docker:restart   # Restart services
+npm run docker:status    # Check service status
+npm run docker:clean     # Clean up containers and volumes
+
+# Development and production
+npm run docker:dev       # Start in development mode
+npm run docker:prod      # Start in production mode
+
+# Database operations
+npm run docker:mongo     # Access MongoDB shell
+npm run docker:shell     # Access app container shell
+npm run db:reset         # Reset database (⚠️ deletes all data)
+npm run db:backup        # Backup database
+npm run db:restore       # Restore database from backup
+
+# General development
+npm run dev              # Start development server
+npm run dev:docker       # Start development with Docker
+npm run clean            # Clean build artifacts
+npm run clean:all        # Clean everything including Docker
+```
+
+### Data Persistence
+
+Your data is automatically saved in:
+- `./docker/volumes/mongodb/` - MongoDB data
+- `./uploads/` - Uploaded files (selfies, documents)
+
+**Important**: Never delete the `./docker/volumes/mongodb/` folder unless you want to lose all your data!
+
+### Troubleshooting Docker Setup
+
+#### Issue: Port 27017 already in use
+```bash
+# Check what's using the port
+sudo lsof -i :27017
+
+# Kill the process or change Docker port in docker-compose.yml
+```
+
+#### Issue: Permission denied on volumes
+```bash
+# Fix permissions on volume directories
+sudo chown -R $USER:$USER docker/volumes/
+sudo chown -R $USER:$USER uploads/
+```
+
+#### Issue: MongoDB connection fails
+```bash
+# Check MongoDB container logs
+docker-compose logs mongodb
+
+# Verify MongoDB is healthy
+docker-compose ps
+
+# Restart MongoDB
+docker-compose restart mongodb
+```
+
+#### Issue: Application won't start
+```bash
+# Check app logs
+docker-compose logs hrms-app
+
+# Rebuild the app
+docker-compose up -d --build --force-recreate hrms-app
+```
+
+### Production Deployment
+
+For production deployment:
+
+1. **Change default passwords** in `docker-compose.yml`:
+   ```yaml
+   MONGO_INITDB_ROOT_PASSWORD: your-secure-mongo-password
+   ME_CONFIG_BASICAUTH_PASSWORD: your-secure-admin-password
+   ```
+
+2. **Use environment-specific .env files**:
+   ```bash
+   cp .env .env.production
+   # Edit .env.production with production values
+   ```
+
+3. **Enable HTTPS** by adding a reverse proxy (nginx/caddy)
+
+4. **Backup strategy**: Regularly backup `./docker/volumes/mongodb/`
+
+---
+
 ## What is HRMS?
 
 HRMS is a Human Resource Management System that helps organizations:

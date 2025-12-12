@@ -1,0 +1,29 @@
+version: '3.8'
+
+# Development overrides for docker-compose.yml
+services:
+  hrms-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      # Mount source code for hot reloading
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+    command: npm run start:dev
+    ports:
+      - "9229:9229"  # Debug port
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health", "||", "exit", "1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  mongodb:
+    # Enable MongoDB profiler in development
+    command: --bind_ip_all --logpath /dev/null --profile 2 --slowms 100
