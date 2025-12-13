@@ -24,7 +24,32 @@ Docker provides:
 ### Quick Start with Docker
 
 #### Prerequisites
-- Docker and Docker Compose installed on your system
+- **Automatic Setup**: Run `./setup-docker.sh` or `npm run setup:docker` to automatically install Docker and Docker Compose if not present
+- **Manual Setup**: Docker and Docker Compose installed on your system
+
+#### Automated Docker Setup (Recommended)
+
+The easiest way to get started is using our automated setup script:
+
+```bash
+# Option 1: Run the script directly
+./setup-docker.sh
+
+# Option 2: Use npm script
+npm run setup:docker
+```
+
+This script will:
+- ✅ Check if Docker and Docker Compose are installed
+- ✅ **Automatically install them if missing** (Ubuntu/Debian/CentOS/RHEL/macOS)
+- ✅ Set up necessary directories and permissions
+- ✅ Create and configure the `.env` file
+- ✅ Start all Docker services
+- ✅ Provide access URLs and useful commands
+
+#### Manual Docker Setup
+
+If you prefer to install Docker manually or the automated script doesn't work for your system:
 
 #### Step 1: Set up Environment Variables
 

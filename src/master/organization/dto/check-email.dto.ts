@@ -5,3 +5,9 @@ export class CheckEmailDto {
   @IsEmail()
   email: string;
 }
+
+export class ResendOtpDto {
+  @IsNotEmpty()
+  @IsEmail()
+  email: string;
+}

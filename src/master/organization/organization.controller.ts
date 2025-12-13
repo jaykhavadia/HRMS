@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { OrganizationService } from './organization.service';
-import { CheckEmailDto } from './dto/check-email.dto';
+import { CheckEmailDto, ResendOtpDto } from './dto/check-email.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth/jwt-auth.guard';
@@ -38,6 +38,12 @@ export class OrganizationController {
   @HttpCode(HttpStatus.OK)
   async verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.organizationService.verifyOtp(dto);
+  }
+
+  @Post('resend-otp')
+  @HttpCode(HttpStatus.OK)
+  async resendOtp(@Body() dto: ResendOtpDto) {
+    return this.organizationService.resendOtp(dto);
   }
 
   @Get('profile')

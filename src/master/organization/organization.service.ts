@@ -4,20 +4,23 @@ import {
   InternalServerErrorException,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { Organization } from './schemas/organization.schema';
-import { TempRegistration } from './schemas/temp-registration.schema';
+import { TempRegistration, TempRegistrationDocument } from './schemas/temp-registration.schema';
 import { User } from '../../tenant/user/schemas/user.schema';
-import { CheckEmailDto } from './dto/check-email.dto';
+import { CheckEmailDto, ResendOtpDto } from './dto/check-email.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { EmailService } from '../../shared/email/email.service';
 
 @Injectable()
 export class OrganizationService {
+  private readonly logger = new Logger(OrganizationService.name);
+
   constructor(
     @InjectModel(Organization.name)
     private organizationModel: Model<Organization>,
@@ -201,6 +204,61 @@ export class OrganizationService {
         'Failed to complete registration: ' + error.message,
       );
     }
+  }
+
+  /**
+   * Resend OTP for registration
+   */
+  async resendOtp(dto: ResendOtpDto): Promise<{ message: string; email: string }> {
+    // Find temp registration
+    const tempRegistration = await this.tempRegistrationModel.findOne({
+      email: dto.email,
+      isVerified: false,
+    }) as TempRegistrationDocument | null;
+
+    if (!tempRegistration) {
+      throw new NotFoundException('No pending registration found for this email. Please register first.');
+    }
+
+    // Check if registration is too old (allow resend for up to 24 hours)
+    // Use ObjectId timestamp which is automatically set when document is created
+    const objectIdTimestamp = tempRegistration._id.getTimestamp();
+    const registrationAge = new Date().getTime() - objectIdTimestamp.getTime();
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+    if (registrationAge > maxAge) {
+      // Delete expired registration
+      await this.tempRegistrationModel.deleteOne({ _id: tempRegistration._id });
+      throw new BadRequestException('Registration has expired. Please register again.');
+    }
+
+    // Generate new 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Set new OTP expiry (15 minutes from now)
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 15);
+
+    // Update temp registration with new OTP
+    tempRegistration.otp = otp;
+    tempRegistration.otpExpiry = otpExpiry;
+
+    await tempRegistration.save();
+
+    // Send new OTP email (catch errors to avoid breaking the flow)
+    try {
+      await this.emailService.sendOtpEmail(dto.email, otp, tempRegistration.companyName);
+    } catch (emailError) {
+      this.logger.warn(
+        `⚠️  Failed to send OTP email to ${dto.email}, but OTP was generated successfully: ${emailError.message}`,
+      );
+      // Continue with the response since OTP generation was successful
+    }
+
+    return {
+      message: 'New OTP generated successfully. Please check your email.',
+      email: dto.email,
+    };
   }
 
   async findById(id: string): Promise<Organization | null> {
