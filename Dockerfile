@@ -41,10 +41,10 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
 # Set default environment variables for container startup
+# These can be overridden by docker-compose or environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV DB_URI=mongodb://admin:admin123@mongodb:27017/hrms
-ENV MASTER_DB_URI=mongodb://admin:admin123@mongodb:27017/hrms
+# Database URLs will be set by docker-compose or environment
 ENV JWT_SECRET=your-docker-jwt-secret-change-in-production
 ENV JWT_EXPIRATION=24h
 ENV FRONTEND_URL=http://localhost:3000
